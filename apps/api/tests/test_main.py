@@ -42,3 +42,41 @@ def test_generate_project() -> None:
     assert data["success"] is True
     assert data["project"]["title"] == "Ambient space track, 90 BPM, D minor, 16 bars"
     assert data["project"]["bpm"] == 90
+
+
+def test_generate_project_has_midi_events() -> None:
+    response = client.post(
+        "/api/generate",
+        json={
+            "description": "Dance track with drums, bass, chords and lead",
+            "style": "dance",
+            "bpm": 128,
+            "bars": 16,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    tracks = data["project"]["tracks"]
+    assert len(tracks) >= 4
+    track_names = {t["name"] for t in tracks}
+    assert "Drums" in track_names
+    assert "Bass" in track_names
+    assert "Chords" in track_names
+    assert "Lead" in track_names
+
+    drums = next(t for t in tracks if t["name"] == "Drums")
+    assert len(drums["regions"]) == 1
+    assert len(drums["regions"][0]["midi_events"]) > 0
+
+
+def test_generate_jarre_style() -> None:
+    response = client.post(
+        "/api/generate",
+        json={"description": "Jean-Michel Jarre ambient space", "style": "jarre"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["config"]["style"] == "jarre"
+    assert data["config"]["bpm"] == 108
+    tracks = data["project"]["tracks"]
+    assert any("Arpeggio" in t["name"] for t in tracks)

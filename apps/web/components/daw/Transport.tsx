@@ -1,6 +1,6 @@
 'use client';
 
-import { Play, Pause, Square, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Square } from 'lucide-react';
 
 export interface TransportProps {
   isPlaying?: boolean;
@@ -12,7 +12,7 @@ export interface TransportProps {
 }
 
 export function Transport({
-  isPlaying = false,
+  isPlaying: _isPlaying = false,
   bpm = 120,
   position = '00:00:00',
   onPlay,

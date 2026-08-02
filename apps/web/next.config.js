@@ -13,6 +13,10 @@ const nextConfig = {
         source: '/api/schema/:path*',
         destination: `${process.env.API_URL || 'http://localhost:8000'}/api/schema/:path*`,
       },
+      {
+        source: '/api/generate',
+        destination: `${process.env.API_URL || 'http://localhost:8000'}/api/generate`,
+      },
     ];
   },
 };

@@ -12,40 +12,38 @@ function noteToFreq(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12);
 }
 
+function _drumNoteName(trackName: string): string {
+  const name = trackName.toLowerCase();
+  if (name.includes('kick')) return 'C1';
+  if (name.includes('snare')) return 'D1';
+  if (name.includes('hat')) return 'F#1';
+  if (name.includes('clap')) return 'A1';
+  return 'C1';
+}
+
 function createDrums() {
-  const kick = new Tone.MembraneSynth({
-    pitchDecay: 0.05,
-    octaves: 10,
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 },
-  }).toDestination();
+  const baseUrl = '/samples/';
+  const options = {
+    attack: 0,
+    release: 0.1,
+  };
+
+  const kick = new Tone.Sampler({ C1: `${baseUrl}kick.wav` }, options).toDestination();
   kick.volume.value = -2;
 
-  const snare = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
-  }).toDestination();
+  const snare = new Tone.Sampler({ D1: `${baseUrl}snare.wav` }, options).toDestination();
   snare.volume.value = -6;
 
-  const hihat = new Tone.MetalSynth({
-    envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5,
-  }).toDestination();
+  const hihat = new Tone.Sampler({ 'F#1': `${baseUrl}hihat.wav` }, options).toDestination();
   hihat.volume.value = -12;
 
-  const clap = new Tone.NoiseSynth({
-    noise: { type: 'pink' },
-    envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 },
-  }).toDestination();
+  const clap = new Tone.Sampler({ A1: `${baseUrl}clap.wav` }, options).toDestination();
   clap.volume.value = -5;
 
   return { kick, snare, hihat, clap };
 }
 
-function createBass(style: string) {
+function createBass(_style: string) {
   const synth = new Tone.MonoSynth({
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.2 },
@@ -63,7 +61,7 @@ function createBass(style: string) {
   return synth;
 }
 
-function createPad(style: string) {
+function createPad(_style: string) {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.3, decay: 0.1, sustain: 0.8, release: 1.0 },
@@ -99,7 +97,7 @@ function createLead(style: string) {
   return synth;
 }
 
-function createStab(style: string) {
+function createStab(_style: string) {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.005, decay: 0.2, sustain: 0.2, release: 0.2 },
@@ -108,7 +106,7 @@ function createStab(style: string) {
   return synth;
 }
 
-function createDrone(style: string) {
+function createDrone(_style: string) {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sine' },
     envelope: { attack: 1.0, decay: 0.5, sustain: 1.0, release: 2.0 },
@@ -121,7 +119,7 @@ function getInstrumentForTrack(
   trackName: string,
   style: string,
   drums: ReturnType<typeof createDrums>
-): Tone.PolySynth | Tone.MonoSynth | Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth {
+): Tone.PolySynth | Tone.MonoSynth | Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth | Tone.Sampler {
   const name = trackName.toLowerCase();
   if (name.includes('kick')) return drums.kick;
   if (name.includes('snare')) return drums.snare;
@@ -195,18 +193,28 @@ export class TonePlayer {
         instrument.connect(compressor);
       }
 
-      const notes = events.map((evt) => ({
-        time: evt.time / 480 / this.config.bpm * 60,
-        note: evt.note,
-        duration: Math.max(0.01, evt.duration / 480 / this.config.bpm * 60),
-        velocity: evt.velocity / 127,
-      }));
+      const notes = events.map((evt) => {
+        const isDrum =
+          trackName.toLowerCase().includes('drum') ||
+          trackName.toLowerCase().includes('kick') ||
+          trackName.toLowerCase().includes('hat') ||
+          trackName.toLowerCase().includes('clap');
+        return {
+          time: (evt.time / 480 / this.config.bpm) * 60,
+          note: evt.note,
+          noteName: isDrum ? _drumNoteName(trackName) : undefined,
+          duration: Math.max(0.01, (evt.duration / 480 / this.config.bpm) * 60),
+          velocity: evt.velocity / 127,
+        };
+      });
 
       const part = new Tone.Part((time, value) => {
         const freq = noteToFreq(value.note);
         const vel = value.velocity;
 
-        if (instrument instanceof Tone.MembraneSynth) {
+        if (instrument instanceof Tone.Sampler) {
+          instrument.triggerAttackRelease(value.noteName || 'C1', value.duration, time, vel);
+        } else if (instrument instanceof Tone.MembraneSynth) {
           instrument.triggerAttackRelease(freq, value.duration, time, vel);
         } else if (instrument instanceof Tone.NoiseSynth) {
           instrument.triggerAttackRelease(value.duration, time, vel);

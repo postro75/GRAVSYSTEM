@@ -4,6 +4,40 @@ import { POST as generatePost } from '@/app/api/generate/route';
 import { POST as waveformPost } from '@/app/api/waveform/route';
 
 describe('API routes', () => {
+  it('generates a Project JSON with MIDI events', async () => {
+    const req = new NextRequest('http://localhost/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description: 'Dance track with drums bass chords lead',
+        style: 'dance',
+        bpm: 128,
+        bars: 16,
+        key: 'D',
+        scale: 'minor',
+        outputType: 'mid',
+      }),
+    });
+    const res = await generatePost(req);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+
+    const project = data.project;
+    expect(project.bpm).toBe(128);
+    expect(project.key).toBe('D');
+    expect(project.tracks.length).toBeGreaterThanOrEqual(4);
+
+    const trackNames = project.tracks.map((t: { name: string }) => t.name);
+    expect(trackNames).toContain('Drums');
+    expect(trackNames).toContain('Bass');
+
+    const drums = project.tracks.find((t: { name: string }) => t.name === 'Drums');
+    expect(drums.regions.length).toBe(1);
+    expect(drums.regions[0].midiEvents.length).toBeGreaterThan(0);
+
+    expect(data.files.some((f: { type: string }) => f.type === 'mid')).toBe(true);
+  });
+
   it('generates a REAPER project', async () => {
     const req = new NextRequest('http://localhost/api/generate', {
       method: 'POST',
@@ -16,34 +50,12 @@ describe('API routes', () => {
         key: 'D',
         scale: 'minor',
         outputType: 'rpp',
-        addFx: false,
       }),
     });
     const res = await generatePost(req);
     const data = await res.json();
     expect(data.success).toBe(true);
-    expect(data.project.files.some((f: { type: string }) => f.type === 'rpp')).toBe(true);
-  });
-
-  it('generates a MIDI file', async () => {
-    const req = new NextRequest('http://localhost/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        description: 'Dance track',
-        style: 'dance',
-        bpm: 128,
-        bars: 16,
-        key: 'D',
-        scale: 'minor',
-        outputType: 'mid',
-        addFx: false,
-      }),
-    });
-    const res = await generatePost(req);
-    const data = await res.json();
-    expect(data.success).toBe(true);
-    expect(data.project.files.some((f: { type: string }) => f.type === 'mid')).toBe(true);
+    expect(data.files.some((f: { type: string }) => f.type === 'rpp')).toBe(true);
   });
 
   it('generates a waveform preview', async () => {

@@ -1,10 +1,6 @@
 import { MusicConfig } from './types';
 import { generateMidiEvents } from './midi';
 
-function escapeRpp(value: string): string {
-  return value.replace(/"/g, '\\"');
-}
-
 function formatReaperMidiSource(config: MusicConfig, trackName: string, channel: number): string {
   const eventsByTrack = generateMidiEvents(config);
   const ticksPerBeat = 960; // REAPER default QN

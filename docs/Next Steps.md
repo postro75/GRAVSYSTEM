@@ -1,33 +1,37 @@
-> Aktualny plan wynika bezpośrednio z `docs/Roadmap.md` i `docs/Phase 0 ROI Critique.md`.
+> Aktualny plan wynika bezpośrednio z `docs/Roadmap.md` i `docs/Phase 1 ROI Critique.md`.
 
-## Aktualna faza: Phase 1 — Text-to-MIDI Core
+## Aktualna faza: Phase 2 — Browser DAW UI
 
-Phase 0 — Foundation ✅ zakończona. Szczegóły w `docs/Phase 0 ROI Critique.md`.
+Phase 0 — Foundation ✅ i Phase 1 — Text-to-MIDI Core ✅ zakończone.
 
 ### Najwyższy priorytet (największy ROI)
 
-1. **Prawdziwy text-to-MIDI w backendzie**
-   - Przenieść logikę z `apps/web/lib/music.ts` + `apps/web/lib/midi.ts` do Pythona (lub wywołać przez API).
-   - Endpoint `/api/generate` zwraca pełny Project JSON z MIDI events.
-   - Frontend renderuje regiony na timeline.
+1. **Piano roll / edytor MIDI**
+   - Kliknięcie regionu otwiera edytor nut.
+   - Możliwość dodawania, przesuwania, usuwania nut.
 
-2. **Sample-based preview**
-   - Zastąpić syntezatory Tone.js samplerami (kick, snare, hihat, clap).
-   - To największy wzrost realizmu przy niskim koszcie.
+2. **Odtwarzanie z transportu**
+   - Podłączyć Play/Pause/Stop do Tone.js.
+   - Cursor na timeline pokazuje aktualną pozycję.
 
-3. **Wyczyść warningi ESLint**
-   - Usunąć unused variables w istniejącym kodzie.
+3. **Ujednolicenie backendu**
+   - Wybrać: FastAPI (rekomendowane) lub Next.js functions.
+   - Jeśli FastAPI — zdeployować na Render/Railway/Fly.
 
 ### Średni priorytet
 
-4. **API URL dla Vercel preview**
-   - Ustawić `API_URL` env var lub proxy w Next.js API routes.
+4. **Lepsze sample'y**
+   - Zamiana syntetycznych WAV na prawdziwe sample perkusji.
 
-5. **Rozszerzyć testy API**
-   - Testy dla generowania MIDI z opisu.
+5. **Export MIDI z backendu**
+   - `/api/generate` zwraca też plik `.mid`.
+
+6. **Mixer podstawowy**
+   - Volume/pan per track.
 
 ### Decyzje do podjęcia
 
+- Stack generowania: FastAPI vs Next.js functions.
+- Hostowanie FastAPI: Render/Railway/Fly.
 - Open-source vs komercyjny.
-- Browser vs backend render audio.
-- Miesięczny budżet API (Stable Audio, Grok, Kimi).
+- Budżet API (Stable Audio, Grok, Kimi).

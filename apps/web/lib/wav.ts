@@ -33,33 +33,8 @@ function midiToFreq(note: number): number {
   return 440 * Math.pow(2, (note - 69) / 12);
 }
 
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
-}
-
-// Improved stateless-ish biquad-style filters. 
-// We re-create filter state per sample block but run it sample-by-sample inside loops.
-function lowpassSample(input: number, cutoff: number, q: number, state: { z: number }): number {
-  const c = Math.min(0.99, Math.max(0.001, cutoff));
-  state.z += c * (input - state.z);
-  // second pole for steeper slope
-  state.z += c * (state.z * 0.5 + input * 0.5 - state.z);
-  return state.z * (1 + q * 0.3);
-}
-
-function highpassSample(input: number, cutoff: number, state: { x: number; y: number }): number {
-  const c = Math.min(0.99, Math.max(0.001, cutoff));
-  state.y = c * (state.y + input - state.x);
-  state.x = input;
-  return input - state.y;
-}
-
-function bandpassSample(input: number, cutoff: number, q: number, lp: { z: number }, hp: { x: number; y: number }): number {
-  return highpassSample(lowpassSample(input, cutoff, q, lp), cutoff, hp);
 }
 
 // White noise with seed
@@ -67,16 +42,6 @@ let noiseSeed = 12345;
 function whiteNoise(): number {
   noiseSeed = (noiseSeed * 1664525 + 1013904223) >>> 0;
   return (noiseSeed / 4294967296) * 2 - 1;
-}
-
-// Seeded RNG for deterministic noise
-function mulberry32(seed: number): () => number {
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function getDrumSound(note: number): Voice['type'] {
@@ -366,43 +331,6 @@ function renderDrum(age: number, rel: number, voice: Voice): number {
   }
 
   return 0;
-}
-
-function renderVoice(t: number, voice: Voice): number {
-  const age = t - voice.startTime;
-  if (age < 0) return 0;
-  const rel = Math.max(0, t - voice.releaseTime);
-
-  let sample: number;
-  if (['kick', 'snare', 'hihat', 'clap'].includes(voice.type)) {
-    sample = renderDrum(age, rel, voice);
-  } else {
-    sample = renderOscillator(t, voice.freq, voice.type);
-    if (voice.type === 'saw' || voice.type === 'square') {
-      sample += renderOscillator(t, voice.freq * 1.003, voice.type) * 0.3;
-      sample *= 0.77;
-    }
-
-    const envAmp = envelopeValue(age, rel, voice.envelope);
-    const filterMod = 1 + voice.filterEnv * (1 - envAmp);
-    const cutoff = clamp(voice.filterCutoff * filterMod, 0.01, 0.99);
-
-    if (voice.filterType === 'lp') {
-      const lp = { z: 0 };
-      sample = lowpassSample(sample, cutoff, voice.filterQ, lp);
-    } else if (voice.filterType === 'hp') {
-      const hp = { x: 0, y: 0 };
-      sample = highpassSample(sample, cutoff, hp);
-    } else if (voice.filterType === 'bp') {
-      const lp = { z: 0 };
-      const hp = { x: 0, y: 0 };
-      sample = bandpassSample(sample, cutoff, voice.filterQ, lp, hp);
-    }
-
-    sample *= envAmp;
-  }
-
-  return sample * voice.gain;
 }
 
 export function generateWav(config: MusicConfig): string {

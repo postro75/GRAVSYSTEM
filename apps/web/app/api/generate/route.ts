@@ -1,33 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildConfig } from '@/lib/music';
+import { generateProjectFromDescription } from '@/lib/generator';
 import { generateMidi } from '@/lib/midi';
-import { generateRpp } from '@/lib/rpp';
-import { GenerationRequest, GeneratedProject, ProjectFile, MusicConfig } from '@/lib/types';
+import { buildConfig } from '@/lib/music';
+import { GenerationRequest, MusicConfig } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
     const body: GenerationRequest = await request.json();
-    const {
+    const { description, style, bpm, bars, key, scale, outputType } = body;
+
+    const project = generateProjectFromDescription({
       description,
       style,
       bpm,
       bars,
       key,
       scale,
-      outputType,
-    } = body;
+    });
 
+    // Backward-compatible file generation for classic export
     const configData = buildConfig(description, { bpm, bars, key, scale, style });
-    const config: MusicConfig = {
-      ...configData,
-      description,
-    };
-
+    const config: MusicConfig = { ...configData, description };
     const id = `project_${Date.now()}`;
-    const timestamp = new Date().toISOString();
-    const files: ProjectFile[] = [];
+    const files: { name: string; type: 'rpp' | 'mid' | 'wav'; content: string; size: number }[] = [];
 
-    if (outputType === 'mid') {
+    if (outputType === 'mid' || !outputType) {
       const midiBase64 = generateMidi(config);
       files.push({
         name: `${id}.mid`,
@@ -35,7 +32,9 @@ export async function POST(request: NextRequest) {
         content: midiBase64,
         size: Math.ceil((midiBase64.length * 3) / 4),
       });
-    } else {
+    }
+    if (outputType === 'rpp') {
+      const { generateRpp } = await import('@/lib/rpp');
       const rppContent = generateRpp(config);
       files.push({
         name: `${id}.rpp`,
@@ -43,7 +42,6 @@ export async function POST(request: NextRequest) {
         content: rppContent,
         size: new TextEncoder().encode(rppContent).length,
       });
-
       const midiBase64 = generateMidi(config);
       files.push({
         name: `${id}.mid`,
@@ -53,15 +51,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const project: GeneratedProject = {
-      id,
-      name: id,
-      createdAt: timestamp,
+    return NextResponse.json({
+      success: true,
+      project,
       config,
       files,
-    };
-
-    return NextResponse.json({ success: true, project });
+    });
   } catch (error) {
     console.error('Generation error:', error);
     return NextResponse.json(

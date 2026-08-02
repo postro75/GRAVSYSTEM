@@ -27,6 +27,14 @@
   - FastAPI scaffold z shared Zod/Pydantic schemas.
   - Vercel production deploy: https://vercel-app-pink-xi.vercel.app
   - `docs/Phase 0 ROI Critique.md`
+- **Phase 1 — Text-to-MIDI Core ukończona:**
+  - FastAPI `/api/generate` zwraca Project JSON z MIDI events.
+  - Pythonowa logika generowania: `music_theory.py` + `pattern_generator.py`.
+  - Frontend renderuje wygenerowane regiony na timeline.
+  - Sample-based preview (kick, snare, hihat, clap).
+  - Next.js API fallback dla Vercel preview.
+  - ESLint zero błędów/zero warningów.
+  - `docs/Phase 1 ROI Critique.md`
 
 ## Wymagane zmienne środowiskowe
 

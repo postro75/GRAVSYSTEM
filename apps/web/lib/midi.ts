@@ -98,10 +98,6 @@ function clampVelocity(v: number): number {
   return Math.max(1, Math.min(127, Math.round(v)));
 }
 
-function beatTicks(beat: number): number {
-  return Math.round(beat * TICKS_PER_BEAT);
-}
-
 // Drum note numbers (GM)
 const DRUM = {
   kick: 36,
@@ -131,7 +127,6 @@ function generateDrumPattern(patternType: string, barTicks: number, style: strin
   const isFill = barIndex > 0 && barIndex % 4 === 3;
 
   for (let step = 0; step < 16; step++) {
-    const beat = step / 4;
     const isKickStep = step % 4 === 0;
     const isBackbeat = step % 8 === 4;
     const isOffbeat = step % 4 === 2;
@@ -187,10 +182,6 @@ function generateBassPattern(
 
   const rootMidi = (octave: number) => chord.root + (octave + 1) * 12;
   const fifthMidi = (octave: number) => ((chord.root + 7) % 12) + (octave + 1) * 12;
-  const thirdMidi = (octave: number) => {
-    const third = chord.notes.length >= 2 ? chord.notes[1] % 12 : (chord.root + (style === 'minor' ? 3 : 4)) % 12;
-    return third + (octave + 1) * 12;
-  };
 
   const add = (step: number, note: number, velocity: number, durFactor: number) => {
     events.push({
@@ -380,7 +371,7 @@ function generateLeadPattern(
   return events;
 }
 
-function generateDronePattern(barTicks: number, chord: { root: number; notes: number[] }, barIndex: number): MidiEvent[] {
+function generateDronePattern(barTicks: number, chord: { root: number; notes: number[] }, _barIndex: number): MidiEvent[] {
   const base = chord.root + (2 + 1) * 12;
   return [
     { time: 0, duration: barTicks, note: base, velocity: 45 },

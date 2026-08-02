@@ -2,17 +2,16 @@
 
 import { useState } from 'react';
 import { Header } from '@/components/Header';
-import { ProjectCard } from '@/components/ProjectCard';
 import { PromptBar } from '@/components/daw/PromptBar';
 import { Transport } from '@/components/daw/Transport';
 import { Timeline } from '@/components/daw/Timeline';
 import { GenerationForm } from '@/components/GenerationForm';
-import { GeneratedProject, GenerationRequest } from '@/lib/types';
-import { Project, createProject, createTrack } from '@gravsystem/core';
+import { GenerationRequest } from '@/lib/types';
+import { Project, ProjectSchema } from '@gravsystem/core';
 import { Loader2 } from 'lucide-react';
 
 export default function Home() {
-  const [projects, setProjects] = useState<GeneratedProject[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [dawProject, setDawProject] = useState<Project | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,28 +23,21 @@ export default function Home() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          description: request.description,
+          style: request.style,
+          bpm: request.bpm,
+          key: request.key,
+          scale: request.scale,
+          bars: request.bars,
+        }),
       });
       const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || 'Generation failed');
       }
-      setProjects((prev) => [data.project, ...prev]);
-
-      // Build a DAW project view from the generated config
-      const config = data.project.config;
-      const project = createProject({
-        title: data.project.name,
-        description: request.description,
-        bpm: config.bpm,
-        key: config.key,
-        scale: config.scale,
-        bars: config.bars,
-      });
-      const tracks = config.trackLayout.map((name: string) =>
-        createTrack({ name, type: 'midi' })
-      );
-      project.tracks = tracks;
+      const project = ProjectSchema.parse(data.project);
+      setProjects((prev) => [project, ...prev]);
       setDawProject(project);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -54,13 +46,14 @@ export default function Home() {
     }
   };
 
-  const handlePromptGenerate = (description: string) =>
-    runGeneration({
-      description,
-      style: 'dance',
-      outputType: 'mid',
-      addFx: true,
-    });
+  const handlePromptGenerate = (description: string) => {
+    const lowered = description.toLowerCase();
+    const style =
+      ['jarre', 'ambient', 'synthwave', 'techno', 'house', 'electro', 'dance'].find((s) =>
+        lowered.includes(s)
+      ) || 'dance';
+    runGeneration({ description, style, outputType: 'mid' });
+  };
 
   const handleClassicGenerate = (request: GenerationRequest) => runGeneration(request);
 
@@ -90,7 +83,17 @@ export default function Home() {
             {projects.length === 0 ? (
               <p className="text-sm text-apple-muted">No projects yet. Generate one above.</p>
             ) : (
-              projects.map((project) => <ProjectCard key={project.id} project={project} />)
+              projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
+                >
+                  <div className="font-medium text-apple-text">{project.title}</div>
+                  <div className="text-apple-muted">
+                    {project.bpm} BPM · {project.key} {project.scale} · {project.tracks.length} tracks
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </section>
