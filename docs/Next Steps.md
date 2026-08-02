@@ -1,42 +1,46 @@
 # GRAVSYSTEM — Next Steps
 
-## Priorytet wysoki
+> Aktualny plan wynika bezpośrednio z `docs/Roadmap.md`. Szczegóły każdej fazy są tam opisane.
 
-1. **Sample-based preview**
-   - Zastąpić syntezatory Tone.js samplerami (kick, snare, hihat, clap) — natychmiastowy wzrost realizmu.
+## Aktualna faza: Phase 0 — Foundation
 
-2. **Eksport Ableton Live `.als`**
-   - Największy wzrost użyteczności po REAPER.
-   - Format: gzipowany XML z trackami i clipami MIDI.
+1. **Monorepo i CI/CD**
+   - Ustalić strukturę repo (`apps/web`, `apps/api`, `packages/core`, `packages/audio`).
+   - Skonfigurować GitHub Actions: lint, type-check, unit tests.
+   - Przygotować `docker-compose.yml` (Postgres, Redis).
 
-3. **LLM do aranżacji**
-   - Grok/Claude zwraca JSON z pełną strukturą utworu (intro, verse, chorus, bridge, outro).
-   - Funkcje/function calling zamiast czystego promptu.
+2. **Data model i API scaffold**
+   - Zdefiniować schemy `Project`, `Track`, `Region`, `MidiEvent`, `Effect` (Zod + Pydantic).
+   - Postawić FastAPI z endpointami health-check.
 
-## Priorytet średni
+3. **Frontend scaffold**
+   - Next.js + Tailwind + shadcn/ui.
+   - Podstawowy layout DAW (prompt bar, timeline, transport).
 
-4. **Więcej stylów i struktur**
-   - house, trance, trap, lo-fi, orchestral.
-   - Perkusja, bas i lead dopasowane do każdego stylu.
+## Następna faza: Phase 1 — Text-to-MIDI Core
 
-5. **Backend render VST (DawDreamer)**
-   - Docker z Pythonem + DawDreamer + Surge XT / Sfizz.
-   - Finalny render offline z profesjonalnymi pluginami.
-   - Uwaga na licencje GPL.
+4. **Prompt parser + symbolic composer**
+   - Grok / Kimi K2.7 zwraca strukturalny JSON aranżacji.
+   - Generowanie MIDI dla perkusji, basu, akordów, leadu.
 
-6. **VST companion plugin**
-   - Plugin łączący aplikację webową z DAW.
-   - Prototyp: VST3/CLAP w C++ z libcurl.
+5. **Browser preview i render**
+   - Tone.js dla natychmiastowego preview.
+   - DawDreamer / Stable Audio dla renderu audio.
 
-## Priorytet niski / eksperymentalne
+6. **Eksport MIDI**
+   - Pobieranie `.mid` z wygenerowanego projektu.
 
-7. **OSC bridge** do sterowania DAW w czasie rzeczywistym.
-8. **Auto-mastering** przez Pedalboard lub API (Landr).
-9. **Marketplace presetów użytkowników**.
-10. **Integracja z AIMLAPI / ElevenLabs Music** jako alternatywa dla Stable Audio.
+## Dalsze fazy (szczegóły w Roadmap)
+
+- Phase 2 — Browser DAW UI (sequencer, piano roll, mixer).
+- Phase 3 — AI Co-Producer (regenerate, extend, stem separation, mastering).
+- Phase 4 — Multi-DAW Export (REAPER, Ableton, Logic, FL, Studio One).
+- Phase 5 — API & Developer Platform.
+- Phase 6 — Collaboration & Social.
+- Phase 7 — Polish & Scale.
 
 ## Decyzje do podjęcia
 
 - Czy GRAVSYSTEM ma być open-source czy komercyjny? (wpływa na wybór GPL vs MIT pluginów)
 - Czy finalny audio ma być generowany w przeglądarce czy na backendzie?
-- Jaki budzet miesięczny na API Stable Audio?
+- Jaki budżet miesięczny na API Stable Audio / Grok / Kimi?

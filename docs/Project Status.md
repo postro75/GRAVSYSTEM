@@ -15,6 +15,11 @@
 - Nowy komponent: `components/TonePreviewButton.tsx`.
 - Nowy endpoint: `app/api/render-stable/route.ts`.
 - Zaktualizowany `components/ProjectCard.tsx` — preview i pro-render obok siebie.
+- Utworzono dokumentację strategiczną:
+  - `docs/Benchmark and Gap Analysis.md`
+  - `docs/Product Specification.md`
+  - `docs/Technical Architecture.md`
+  - `docs/Roadmap.md`
 
 ## Wymagane zmienne środowiskowe
 
