@@ -2,19 +2,17 @@
 
 import { useState } from 'react';
 import { GeneratedProject, ProjectFile } from '@/lib/types';
-import { Waveform } from './Waveform';
+import { TonePreviewButton } from './TonePreviewButton';
 import {
   Download,
   FileAudio,
   FileMusic,
-  Music,
-  Play,
-  Pause,
+  Sparkles,
+  Loader2,
   Activity,
   Ruler,
   KeyRound,
   Palette,
-  Waves,
 } from 'lucide-react';
 
 interface ProjectCardProps {
@@ -48,55 +46,32 @@ function base64ToBlob(base64: string, type: 'rpp' | 'mid' | 'wav') {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [waveformData, setWaveformData] = useState<string | null>(null);
-  const [loadingWaveform, setLoadingWaveform] = useState(false);
+  const [proAudio, setProAudio] = useState<string | null>(null);
+  const [proLoading, setProLoading] = useState(false);
+  const [proError, setProError] = useState<string | null>(null);
 
   const rppFile = project.files.find((f) => f.type === 'rpp');
   const midiFile = project.files.find((f) => f.type === 'mid');
 
-  const generateWaveform = async () => {
-    if (waveformData) return;
-    setLoadingWaveform(true);
+  const renderStableAudio = async () => {
+    setProLoading(true);
+    setProError(null);
     try {
-      const res = await fetch('/api/waveform', {
+      const res = await fetch('/api/render-stable', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: project.config }),
       });
       const data = await res.json();
-      if (data.success) {
-        setWaveformData(data.wav);
+      if (!data.success) {
+        throw new Error(data.error || 'Pro render failed');
       }
+      setProAudio(data.wav);
+    } catch (err) {
+      setProError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
-      setLoadingWaveform(false);
+      setProLoading(false);
     }
-  };
-
-  const playPreview = async () => {
-    if (audio) {
-      if (playing) {
-        audio.pause();
-        setPlaying(false);
-      } else {
-        audio.play();
-        setPlaying(true);
-      }
-      return;
-    }
-
-    await generateWaveform();
-    if (!waveformData) return;
-
-    const blob = base64ToBlob(waveformData, 'wav');
-    const url = URL.createObjectURL(blob);
-    const newAudio = new Audio(url);
-    newAudio.onended = () => setPlaying(false);
-    newAudio.onpause = () => setPlaying(false);
-    setAudio(newAudio);
-    newAudio.play();
-    setPlaying(true);
   };
 
   const formatDate = (iso: string) => {
@@ -134,24 +109,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={playPreview}
-          disabled={loadingWaveform}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-apple-accent text-white shadow-apple-sm transition-all hover:scale-105 hover:bg-apple-accent-hover active:scale-95 disabled:opacity-60"
-          aria-label={playing ? 'Pause preview' : 'Play preview'}
-        >
-          {loadingWaveform ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-          ) : playing ? (
-            <Pause size={18} fill="currentColor" />
-          ) : (
-            <Play size={18} fill="currentColor" className="ml-0.5" />
-          )}
-        </button>
+        <TonePreviewButton config={project.config} />
       </div>
-
-      {waveformData && <Waveform audioBase64={waveformData} />}
 
       <div className="flex flex-wrap gap-2">
         {rppFile && (
@@ -176,18 +135,28 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <Download size={12} className="text-apple-muted" />
           </button>
         )}
-        {!waveformData && (
-          <button
-            type="button"
-            onClick={generateWaveform}
-            disabled={loadingWaveform}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-apple-bg px-3 py-2 text-xs font-medium text-apple-text transition-colors hover:bg-apple-border/40 disabled:opacity-60"
-          >
-            <Waves size={14} className="text-apple-accent" />
-            {loadingWaveform ? 'Generating preview...' : 'Generate preview WAV'}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={renderStableAudio}
+          disabled={proLoading || !!proAudio}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-apple-accent px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-apple-accent-hover disabled:opacity-60"
+        >
+          {proLoading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Sparkles size={14} />
+          )}
+          {proLoading ? 'Rendering...' : proAudio ? 'Pro render ready' : 'Pro render (Stable Audio)'}
+        </button>
       </div>
+
+      {proError && (
+        <p className="text-xs text-apple-danger">{proError}</p>
+      )}
+
+      {proAudio && (
+        <audio controls className="w-full" src={`data:audio/wav;base64,${proAudio}`} />
+      )}
     </div>
   );
 }
