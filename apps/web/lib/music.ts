@@ -275,7 +275,7 @@ export function detectStyle(description: string): string {
 export function extractChords(description: string): string[] | null {
   const chordRe = '(?<![A-Za-z])[A-G][#b]?(?:m(?:in)?|maj7?|7|sus4|dim|aug)?(?![A-Za-z])';
   const clusterMatch = description.match(
-    new RegExp(`(?:akordy|chords?|progresja|progression)\s*[:-]?\s*((?:${chordRe}[,\s]+){2,}${chordRe})`, 'i')
+    new RegExp(`(?:akordy|chords?|progresja|progression)\\s*[:-]?\\s*((?:${chordRe}[,\\s]+){2,}${chordRe})`, 'i')
   );
   if (clusterMatch) {
     return clusterMatch[1].match(new RegExp(chordRe, 'g')) || null;

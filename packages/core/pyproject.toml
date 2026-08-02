@@ -1,0 +1,14 @@
+[project]
+name = "gravsystem-core"
+version = "1.0.0"
+description = "Shared Pydantic schemas for GRAVSYSTEM"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "mypy>=1.8.0",
+]

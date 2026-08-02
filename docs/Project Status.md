@@ -20,6 +20,13 @@
   - `docs/Product Specification.md`
   - `docs/Technical Architecture.md`
   - `docs/Roadmap.md`
+- **Phase 0 — Foundation ukończona:**
+  - Monorepo `apps/web`, `apps/api`, `packages/core`.
+  - GitHub Actions CI, Docker Compose (Postgres + Redis).
+  - DAW shell: prompt bar, transport, timeline.
+  - FastAPI scaffold z shared Zod/Pydantic schemas.
+  - Vercel production deploy: https://vercel-app-pink-xi.vercel.app
+  - `docs/Phase 0 ROI Critique.md`
 
 ## Wymagane zmienne środowiskowe
 

@@ -40,10 +40,10 @@ export interface ProjectFile {
 export interface GenerationRequest {
   description: string;
   style: string;
-  bpm: number;
-  key: string;
-  scale: 'major' | 'minor';
-  bars: number;
+  bpm?: number;
+  key?: string;
+  scale?: 'major' | 'minor';
+  bars?: number;
   outputType: 'rpp' | 'mid';
-  addFx: boolean;
+  addFx?: boolean;
 }

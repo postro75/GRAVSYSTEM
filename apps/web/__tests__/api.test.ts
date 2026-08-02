@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { NextRequest } from 'next/server';
 import { POST as generatePost } from '@/app/api/generate/route';
 import { POST as waveformPost } from '@/app/api/waveform/route';
 
 describe('API routes', () => {
   it('generates a REAPER project', async () => {
-    const req = new Request('http://localhost/api/generate', {
+    const req = new NextRequest('http://localhost/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -25,7 +26,7 @@ describe('API routes', () => {
   });
 
   it('generates a MIDI file', async () => {
-    const req = new Request('http://localhost/api/generate', {
+    const req = new NextRequest('http://localhost/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -46,7 +47,7 @@ describe('API routes', () => {
   });
 
   it('generates a waveform preview', async () => {
-    const req = new Request('http://localhost/api/waveform', {
+    const req = new NextRequest('http://localhost/api/waveform', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
