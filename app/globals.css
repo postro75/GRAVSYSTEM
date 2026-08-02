@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-apple-bg text-apple-text;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-apple-sm bg-apple-accent px-5 py-2.5 text-sm font-medium text-white shadow-apple-sm transition-all hover:bg-apple-accent-hover hover:shadow-apple active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-apple-sm bg-white px-5 py-2.5 text-sm font-medium text-apple-text shadow-apple-sm ring-1 ring-apple-border transition-all hover:bg-apple-bg active:scale-[0.98];
+  }
+
+  .card {
+    @apply rounded-apple bg-white p-6 shadow-apple ring-1 ring-apple-border/50;
+  }
+
+  .input {
+    @apply w-full rounded-apple-sm border-apple-border bg-white px-4 py-2.5 text-sm text-apple-text outline-none ring-1 ring-apple-border transition-all placeholder:text-apple-muted focus:border-apple-accent focus:ring-apple-accent;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-apple-muted;
+  }
+}

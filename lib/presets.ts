@@ -1,0 +1,61 @@
+import { Preset } from './types';
+
+export const STYLE_PRESETS: Preset[] = [
+  {
+    id: 'jarre-oxygene',
+    label: 'Jarre Oxygène',
+    description: 'Spokojny utwór w stylu Jean-Michel Jarre, 108 BPM, D minor, 32 takty, arpeggia i space pad',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/1973_Moog_modular_synthesizer.jpg/960px-1973_Moog_modular_synthesizer.jpg',
+    bpm: 108,
+    bars: 32,
+    key: 'D',
+    scale: 'minor',
+    style: 'jarre',
+  },
+  {
+    id: 'kavinsky-drive',
+    label: 'Kavinsky Drive',
+    description: 'Synthwave w stylu Kavinsky, 110 BPM, A minor, 24 takty, gęsta linia basowa i pad',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Neon_Night_3_%2823358201426%29.jpg/960px-Neon_Night_3_%2823358201426%29.jpg',
+    bpm: 110,
+    bars: 24,
+    key: 'A',
+    scale: 'minor',
+    style: 'synthwave',
+  },
+  {
+    id: 'guetta-dance',
+    label: 'Guetta Dance',
+    description: 'Energetyczny dance/electro w stylu David Guetta, 128 BPM, D minor, 16 taktów, four-on-floor',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Energetic_live_concert_performance_at_an_outdoor_music_festival_in_the_evening_with_vibrant_lights.jpg/960px-Energetic_live_concert_performance_at_an_outdoor_music_festival_in_the_evening_with_vibrant_lights.jpg',
+    bpm: 128,
+    bars: 16,
+    key: 'D',
+    scale: 'minor',
+    style: 'dance',
+  },
+  {
+    id: 'ambient-space',
+    label: 'Ambient Space',
+    description: 'Ambient space, 90 BPM, C major, 32 takty, rozległe pady i delikatne arpeggia',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Tarantula_Nebula_by_JWST.jpg/960px-Tarantula_Nebula_by_JWST.jpg',
+    bpm: 90,
+    bars: 32,
+    key: 'C',
+    scale: 'major',
+    style: 'ambient',
+  },
+  {
+    id: 'techno-club',
+    label: 'Techno Club',
+    description: 'Techno club, 130 BPM, F minor, 16 taktów, mocny kick i syntetyczne elementy',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/DFC_5183_Hands-on_mixing_a_DJ_tweaks_levels_and_cues_glowing_controls_on_a_Pioneer_DJ_mixer_under_red_club_lights.jpg/960px-DFC_5183_Hands-on_mixing_a_DJ_tweaks_levels_and_cues_glowing_controls_on_a_Pioneer_DJ_mixer_under_red_club_lights.jpg',
+    bpm: 130,
+    bars: 16,
+    key: 'F',
+    scale: 'minor',
+    style: 'techno',
+  },
+];
+
+export const DEFAULT_PRESET = STYLE_PRESETS[0];
