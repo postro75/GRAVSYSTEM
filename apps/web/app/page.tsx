@@ -23,7 +23,7 @@ import {
   exportProjectsJson,
   importProjectsJson,
 } from '@/lib/storage';
-import { Loader2, Download, Upload, FolderOpen } from 'lucide-react';
+import { Loader2, Download, Upload, FolderOpen, SlidersHorizontal, Info, X } from 'lucide-react';
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -46,6 +46,8 @@ export default function Home() {
   });
   const [position, setPosition] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [showMixer, setShowMixer] = useState(false);
+  const [showHints, setShowHints] = useState(true);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
 
@@ -137,9 +139,15 @@ export default function Home() {
 
   const handleClassicGenerate = (request: FormGenerationRequest) => runGeneration(request);
 
-  const handlePlay = () => playerRef.current?.play();
+  const handlePlay = async () => {
+    if (!playerState.isReady) {
+      await playerRef.current?.resumeAudio();
+    }
+    playerRef.current?.play();
+  };
   const handlePause = () => playerRef.current?.pause();
   const handleStop = () => playerRef.current?.stop();
+  const handleEnableAudio = () => playerRef.current?.resumeAudio();
 
   const handleRegionChange = async (updatedRegion: Region) => {
     if (!dawProject) return;
@@ -301,53 +309,105 @@ export default function Home() {
           onMetronomeToggle={handleToggleMetronome}
         />
 
-        <div className="flex items-center justify-end gap-2">
+        {showHints && (
+          <div className="flex items-start gap-3 rounded-xl border border-apple-accent/30 bg-apple-accent/10 px-4 py-3 text-sm text-apple-text">
+            <Info size={16} className="mt-0.5 shrink-0 text-apple-accent" />
+            <div className="flex-1 space-y-1">
+              <p className="font-medium">Getting started</p>
+              <p className="text-xs text-apple-muted">
+                1. Type a style like &quot;Jean-Michel Jarre ambient space&quot; or &quot;Kavinsky synthwave&quot; and click Generate.
+              </p>
+              <p className="text-xs text-apple-muted">
+                2. Press Play. If you see <strong>Enable Audio</strong> below, click it first — browsers require a click to start sound.
+              </p>
+              <p className="text-xs text-apple-muted">
+                3. Click any region to edit notes, or open the Mixer to adjust volume and pan.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowHints(false)}
+              className="shrink-0 rounded p-1 text-apple-muted hover:bg-white/10"
+              title="Hide hints"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {!playerState.isReady && !playerState.loading && (
           <button
-            onClick={handleExportJson}
-            disabled={projects.length === 0}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+            onClick={handleEnableAudio}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-apple-accent/30 bg-apple-accent/10 px-4 py-2 text-sm font-medium text-apple-accent transition hover:bg-apple-accent/20"
           >
-            <FolderOpen size={14} />
-            Export JSON
+            Enable Audio
           </button>
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10">
-            <Upload size={14} />
-            Import JSON
-            <input
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImportJson(file);
-                e.currentTarget.value = '';
-              }}
-            />
-          </label>
-          <button
-            onClick={handleExportRpp}
-            disabled={!dawProject}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-          >
-            <Download size={14} />
-            Export REAPER
-          </button>
-          <button
-            onClick={handleExportMidi}
-            disabled={!dawProject}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-          >
-            <Download size={14} />
-            Export MIDI
-          </button>
-          <button
-            onClick={handleExportWav}
-            disabled={!dawProject || isRendering}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-          >
-            {isRendering ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            Export WAV
-          </button>
+        )}
+
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {dawProject && dawProject.tracks.length > 0 && (
+              <button
+                onClick={() => setShowMixer((v) => !v)}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                  showMixer
+                    ? 'border-apple-accent/50 bg-apple-accent/10 text-apple-accent'
+                    : 'border-white/10 bg-white/5 text-apple-text hover:bg-white/10'
+                }`}
+              >
+                <SlidersHorizontal size={14} />
+                {showMixer ? 'Hide Mixer' : 'Show Mixer'}
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportJson}
+              disabled={projects.length === 0}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+            >
+              <FolderOpen size={14} />
+              Export JSON
+            </button>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10">
+              <Upload size={14} />
+              Import JSON
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImportJson(file);
+                  e.currentTarget.value = '';
+                }}
+              />
+            </label>
+            <button
+              onClick={handleExportRpp}
+              disabled={!dawProject}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+            >
+              <Download size={14} />
+              Export REAPER
+            </button>
+            <button
+              onClick={handleExportMidi}
+              disabled={!dawProject}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+            >
+              <Download size={14} />
+              Export MIDI
+            </button>
+            <button
+              onClick={handleExportWav}
+              disabled={!dawProject || isRendering}
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+            >
+              {isRendering ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Export WAV
+            </button>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1">
@@ -363,7 +423,7 @@ export default function Home() {
           />
         </div>
 
-        {dawProject && dawProject.tracks.length > 0 && (
+        {showMixer && dawProject && dawProject.tracks.length > 0 && (
           <Mixer tracks={dawProject.tracks} onChange={handleTrackChange} />
         )}
 

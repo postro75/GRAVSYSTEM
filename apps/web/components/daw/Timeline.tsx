@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Track, Region } from '@gravsystem/core';
 import { ZoomIn, ZoomOut, MoveHorizontal, Copy, Trash2 } from 'lucide-react';
+import { trackStyle } from '@/lib/track-styles';
 
 export interface TimelineProps {
   tracks?: Track[];
@@ -161,10 +162,19 @@ export function Timeline({
             Generated tracks will appear here
           </div>
         ) : (
-          tracks.map((track) => (
+          tracks.map((track) => {
+            const style = trackStyle(track.name);
+            const Icon = style.icon;
+            return (
             <div key={track.id} className="flex h-14 border-b border-white/5 hover:bg-white/[0.02]">
-              <div className="flex w-48 shrink-0 items-center border-r border-white/10 px-3 text-sm text-apple-text">
-                {track.name}
+              <div className="flex w-48 shrink-0 items-center gap-2 border-r border-white/10 px-3 text-sm text-apple-text">
+                <div
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                  style={{ backgroundColor: `${style.color}30`, color: style.color }}
+                >
+                  <Icon size={14} />
+                </div>
+                <span className="truncate">{track.name}</span>
               </div>
               <div className="relative" style={{ width: totalBeats * beatWidth }}>
                 {track.regions.map((region) => {
@@ -172,16 +182,18 @@ export function Timeline({
                   return (
                     <div
                       key={region.id}
-                      className="group absolute top-2 bottom-2 cursor-grab rounded-md bg-apple-accent/30 ring-1 ring-apple-accent/50 transition hover:bg-apple-accent/40 active:cursor-grabbing"
+                      className="group absolute top-2 bottom-2 cursor-grab rounded-md ring-1 transition active:cursor-grabbing"
                       style={{
                         left: visual.startBeat * beatWidth,
                         width: visual.duration * beatWidth,
+                        backgroundColor: `${style.color}33`,
+                        borderColor: `${style.color}80`,
                       }}
                       onClick={() => onRegionClick?.(track, region)}
                       onPointerDown={(e) => handlePointerDown(e, track, region, 'move')}
                     >
                       <div className="flex items-center justify-between px-1.5 py-1">
-                        <div className="truncate text-[10px] text-apple-text">{region.name}</div>
+                        <div className="truncate text-[10px] text-white/90">{region.name}</div>
                         <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                           <button
                             type="button"
@@ -222,7 +234,8 @@ export function Timeline({
                 })}
               </div>
             </div>
-          ))
+          );
+        })
         )}
 
         {/* Playback cursor */}

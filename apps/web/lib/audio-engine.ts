@@ -234,6 +234,17 @@ export class AudioEngine {
     }
   }
 
+  async resumeAudio() {
+    if (this.isStarted) return;
+    try {
+      await Tone.start();
+      this.isStarted = true;
+      this.emit({ isReady: true });
+    } catch (err) {
+      this.emit({ error: err instanceof Error ? err.message : 'Audio engine resume failed' });
+    }
+  }
+
   async loadProject(project: Project) {
     if (!this.isStarted) return;
     this.emit({ loading: true, isReady: false });
