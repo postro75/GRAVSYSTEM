@@ -12,7 +12,7 @@ export interface TransportProps {
 }
 
 export function Transport({
-  isPlaying: _isPlaying = false,
+  isPlaying = false,
   bpm = 120,
   position = '00:00:00',
   onPlay,
@@ -24,7 +24,11 @@ export function Transport({
       <div className="flex items-center gap-2">
         <button
           onClick={onPlay}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-apple-accent text-white hover:bg-apple-accent/90"
+          className={`flex h-9 w-9 items-center justify-center rounded-full text-white transition ${
+            isPlaying
+              ? 'bg-apple-accent ring-2 ring-white/30'
+              : 'bg-apple-accent hover:bg-apple-accent/90'
+          }`}
         >
           <Play size={16} fill="currentColor" />
         </button>

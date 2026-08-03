@@ -1,28 +1,30 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MusicConfig } from '@/lib/types';
+import { Project } from '@gravsystem/core';
 import { TonePlayer, TonePlayerState } from '@/lib/tone-engine';
 import { Play, Pause, Loader2 } from 'lucide-react';
 
 interface TonePreviewButtonProps {
-  config: MusicConfig;
+  project: Project;
 }
 
-export function TonePreviewButton({ config }: TonePreviewButtonProps) {
+export function TonePreviewButton({ project }: TonePreviewButtonProps) {
   const playerRef = useRef<TonePlayer | null>(null);
   const [state, setState] = useState<TonePlayerState>({ isPlaying: false, isReady: false, error: null });
 
   useEffect(() => {
-    const player = new TonePlayer(config, setState);
+    const player = new TonePlayer(setState);
     playerRef.current = player;
-    player.init();
+    player.init().then(() => {
+      player.loadProject(project);
+    });
 
     return () => {
       player.dispose();
       playerRef.current = null;
     };
-  }, [config]);
+  }, [project]);
 
   const toggle = () => {
     if (!playerRef.current) return;

@@ -35,6 +35,14 @@
   - Next.js API fallback dla Vercel preview.
   - ESLint zero błędów/zero warningów.
   - `docs/Phase 1 ROI Critique.md`
+- **Phase 2 — Browser DAW UI ukończona:**
+  - Piano-roll editor: dodawanie, zaznaczanie, przesuwanie, usuwanie nut.
+  - Kliknięcie regionu na timeline otwiera piano roll.
+  - Transport Play/Pause/Stop steruje `Tone.Transport`.
+  - Playback cursor na timeline.
+  - Zmiany w piano rollu aktualizują projekt i przeładowują audio.
+  - `docs/Backend Consolidation Plan.md` — konsolidacja backendu na FastAPI + Render.
+  - `docs/Phase 2 ROI Critique.md`
 
 ## Wymagane zmienne środowiskowe
 

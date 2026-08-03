@@ -1,15 +1,26 @@
 'use client';
 
-import { Track } from '@gravsystem/core';
+import { Track, Region } from '@gravsystem/core';
 
 export interface TimelineProps {
   tracks?: Track[];
   bars?: number;
+  position?: number; // seconds
+  bpm?: number;
+  onRegionClick?: (track: Track, region: Region) => void;
 }
 
-export function Timeline({ tracks = [], bars = 16 }: TimelineProps) {
+export function Timeline({
+  tracks = [],
+  bars = 16,
+  position = 0,
+  bpm = 120,
+  onRegionClick,
+}: TimelineProps) {
   const beatWidth = 40; // px per beat
   const totalBeats = bars * 4;
+  const secondsPerBeat = 60 / bpm;
+  const positionBeats = position / secondsPerBeat;
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5">
@@ -30,7 +41,7 @@ export function Timeline({ tracks = [], bars = 16 }: TimelineProps) {
       </div>
 
       {/* Tracks */}
-      <div className="flex-1 overflow-auto">
+      <div className="relative flex-1 overflow-auto">
         {tracks.length === 0 ? (
           <div className="flex h-48 items-center justify-center text-sm text-apple-muted">
             Generated tracks will appear here
@@ -43,9 +54,10 @@ export function Timeline({ tracks = [], bars = 16 }: TimelineProps) {
               </div>
               <div className="relative flex-1">
                 {track.regions.map((region) => (
-                  <div
+                  <button
                     key={region.id}
-                    className="absolute top-2 bottom-2 rounded-md bg-apple-accent/30 ring-1 ring-apple-accent/50"
+                    onClick={() => onRegionClick?.(track, region)}
+                    className="absolute top-2 bottom-2 rounded-md bg-apple-accent/30 ring-1 ring-apple-accent/50 transition hover:bg-apple-accent/40"
                     style={{
                       left: region.startBeat * beatWidth,
                       width: region.duration * beatWidth,
@@ -56,6 +68,12 @@ export function Timeline({ tracks = [], bars = 16 }: TimelineProps) {
             </div>
           ))
         )}
+
+        {/* Playback cursor */}
+        <div
+          className="pointer-events-none absolute top-0 bottom-0 w-px bg-apple-accent"
+          style={{ left: 192 + positionBeats * beatWidth }}
+        />
       </div>
     </div>
   );

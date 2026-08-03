@@ -1,6 +1,5 @@
 import * as Tone from 'tone';
-import { MusicConfig } from './types';
-import { generateMidiEvents } from './midi';
+import { Project } from '@gravsystem/core';
 
 export interface TonePlayerState {
   isPlaying: boolean;
@@ -43,7 +42,7 @@ function createDrums() {
   return { kick, snare, hihat, clap };
 }
 
-function createBass(_style: string) {
+function createBass() {
   const synth = new Tone.MonoSynth({
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.2 },
@@ -61,7 +60,7 @@ function createBass(_style: string) {
   return synth;
 }
 
-function createPad(_style: string) {
+function createPad() {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.3, decay: 0.1, sustain: 0.8, release: 1.0 },
@@ -70,18 +69,18 @@ function createPad(_style: string) {
   return synth;
 }
 
-function createArpeggio(style: string) {
+function createArpeggio() {
   const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: style === 'jarre' ? 'triangle' : 'sawtooth' },
+    oscillator: { type: 'triangle' },
     envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.3 },
   });
   synth.volume.value = -12;
   return synth;
 }
 
-function createLead(style: string) {
+function createLead() {
   const synth = new Tone.MonoSynth({
-    oscillator: { type: style === 'jarre' ? 'sine' : 'square' },
+    oscillator: { type: 'square' },
     envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 0.5 },
     filterEnvelope: {
       attack: 0.05,
@@ -97,7 +96,7 @@ function createLead(style: string) {
   return synth;
 }
 
-function createStab(_style: string) {
+function createStab() {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sawtooth' },
     envelope: { attack: 0.005, decay: 0.2, sustain: 0.2, release: 0.2 },
@@ -106,7 +105,7 @@ function createStab(_style: string) {
   return synth;
 }
 
-function createDrone(_style: string) {
+function createDrone() {
   const synth = new Tone.PolySynth(Tone.Synth, {
     oscillator: { type: 'sine' },
     envelope: { attack: 1.0, decay: 0.5, sustain: 1.0, release: 2.0 },
@@ -117,42 +116,39 @@ function createDrone(_style: string) {
 
 function getInstrumentForTrack(
   trackName: string,
-  style: string,
   drums: ReturnType<typeof createDrums>
-): Tone.PolySynth | Tone.MonoSynth | Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth | Tone.Sampler {
+): Tone.PolySynth | Tone.MonoSynth | Tone.Sampler {
   const name = trackName.toLowerCase();
   if (name.includes('kick')) return drums.kick;
   if (name.includes('snare')) return drums.snare;
   if (name.includes('hat')) return drums.hihat;
   if (name.includes('drum')) return drums.kick;
   if (name.includes('clap')) return drums.clap;
-  if (name.includes('bass')) return createBass(style);
-  if (name.includes('pad') || name.includes('string')) return createPad(style);
-  if (name.includes('drone')) return createDrone(style);
-  if (name.includes('arpeggio')) return createArpeggio(style);
-  if (name.includes('chords') || name.includes('stab')) return createStab(style);
-  if (name.includes('lead')) return createLead(style);
-  return createPad(style);
+  if (name.includes('bass')) return createBass();
+  if (name.includes('pad') || name.includes('string')) return createPad();
+  if (name.includes('drone')) return createDrone();
+  if (name.includes('arpeggio')) return createArpeggio();
+  if (name.includes('chords') || name.includes('stab')) return createStab();
+  if (name.includes('lead')) return createLead();
+  return createPad();
 }
 
 export class TonePlayer {
-  private config: MusicConfig;
+  private project: Project | null = null;
   private parts: Tone.Part[] = [];
-  private instruments: (Tone.ToneAudioNode | undefined)[] = [];
+  private instruments: Tone.ToneAudioNode[] = [];
   private effects: Tone.ToneAudioNode[] = [];
   private isStarted = false;
   private onStateChange?: (state: TonePlayerState) => void;
+  private animationFrame?: number;
 
-  constructor(config: MusicConfig, onStateChange?: (state: TonePlayerState) => void) {
-    this.config = config;
+  constructor(onStateChange?: (state: TonePlayerState) => void) {
     this.onStateChange = onStateChange;
   }
 
   async init() {
     try {
       await Tone.start();
-      this.buildChain();
-      this.schedule();
       this.isStarted = true;
       this.emitState({ isPlaying: false, isReady: true, error: null });
     } catch (err) {
@@ -164,49 +160,62 @@ export class TonePlayer {
     }
   }
 
+  loadProject(project: Project) {
+    this.project = project;
+    this.disposeParts();
+    this.buildChain();
+    Tone.Transport.bpm.value = project.bpm;
+    const totalSeconds = project.bars * 4 * (60 / project.bpm);
+    Tone.Transport.loop = true;
+    Tone.Transport.loopStart = 0;
+    Tone.Transport.loopEnd = totalSeconds;
+  }
+
+  private disposeParts() {
+    this.parts.forEach((part) => part.dispose());
+    this.instruments.forEach((inst) => inst.dispose());
+    this.parts = [];
+    this.instruments = [];
+  }
+
   private buildChain() {
-    // Master effects
+    if (!this.project) return;
+
     const reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.02, wet: 0.25 }).toDestination();
     const delay = new Tone.FeedbackDelay('8n.', 0.25).connect(reverb);
     const compressor = new Tone.Compressor(-18, 3).connect(delay);
     const limiter = new Tone.Limiter(-1).toDestination();
     compressor.connect(limiter);
-
     this.effects = [reverb, delay, compressor, limiter];
 
     const drums = createDrums();
-    const eventsByTrack = generateMidiEvents(this.config);
 
-    for (const [trackName, events] of eventsByTrack) {
-      const instrument = getInstrumentForTrack(trackName, this.config.style, drums);
+    for (const track of this.project.tracks) {
+      const instrument = getInstrumentForTrack(track.name, drums);
       this.instruments.push(instrument);
 
-      // Connect non-drums through master effects chain
       const isDrum =
-        trackName.toLowerCase().includes('drum') ||
-        trackName.toLowerCase().includes('kick') ||
-        trackName.toLowerCase().includes('hat') ||
-        trackName.toLowerCase().includes('clap');
+        track.name.toLowerCase().includes('drum') ||
+        track.name.toLowerCase().includes('kick') ||
+        track.name.toLowerCase().includes('hat') ||
+        track.name.toLowerCase().includes('clap');
 
-      if (!isDrum) {
+      if (!isDrum && 'connect' in instrument) {
         instrument.disconnect();
         instrument.connect(compressor);
       }
 
-      const notes = events.map((evt) => {
-        const isDrum =
-          trackName.toLowerCase().includes('drum') ||
-          trackName.toLowerCase().includes('kick') ||
-          trackName.toLowerCase().includes('hat') ||
-          trackName.toLowerCase().includes('clap');
-        return {
-          time: (evt.time / 480 / this.config.bpm) * 60,
-          note: evt.note,
-          noteName: isDrum ? _drumNoteName(trackName) : undefined,
-          duration: Math.max(0.01, (evt.duration / 480 / this.config.bpm) * 60),
+      const notes = track.regions.flatMap((region) =>
+        region.midiEvents.map((evt) => ({
+          time: (evt.start / this.project!.bpm) * 60,
+          note: evt.pitch,
+          noteName: isDrum ? _drumNoteName(track.name) : undefined,
+          duration: Math.max(0.01, (evt.duration / this.project!.bpm) * 60),
           velocity: evt.velocity / 127,
-        };
-      });
+        }))
+      );
+
+      if (notes.length === 0) continue;
 
       const part = new Tone.Part((time, value) => {
         const freq = noteToFreq(value.note);
@@ -214,12 +223,6 @@ export class TonePlayer {
 
         if (instrument instanceof Tone.Sampler) {
           instrument.triggerAttackRelease(value.noteName || 'C1', value.duration, time, vel);
-        } else if (instrument instanceof Tone.MembraneSynth) {
-          instrument.triggerAttackRelease(freq, value.duration, time, vel);
-        } else if (instrument instanceof Tone.NoiseSynth) {
-          instrument.triggerAttackRelease(value.duration, time, vel);
-        } else if (instrument instanceof Tone.MetalSynth) {
-          instrument.triggerAttackRelease(value.duration, time, vel);
         } else if (instrument instanceof Tone.PolySynth || instrument instanceof Tone.MonoSynth) {
           instrument.triggerAttackRelease(freq, value.duration, time, vel);
         }
@@ -228,20 +231,6 @@ export class TonePlayer {
       part.start(0);
       this.parts.push(part);
     }
-
-    // Set transport loop and BPM
-    Tone.Transport.bpm.value = this.config.bpm;
-    const totalSeconds = this.config.bars * 4 * (60 / this.config.bpm);
-    Tone.Transport.loop = true;
-    Tone.Transport.loopStart = 0;
-    Tone.Transport.loopEnd = totalSeconds;
-  }
-
-  private schedule() {
-    Tone.Transport.cancel(0);
-    this.parts.forEach((part) => part.dispose());
-    this.parts = [];
-    this.buildChain();
   }
 
   play() {
@@ -261,11 +250,19 @@ export class TonePlayer {
     this.emitState({ isPlaying: false, isReady: true, error: null });
   }
 
+  getPositionSeconds(): number {
+    return Tone.Transport.seconds;
+  }
+
+  getPositionBeats(): number {
+    return Tone.Transport.position ? Tone.Time(Tone.Transport.position).toSeconds() * (this.project?.bpm ?? 120) / 60 : 0;
+  }
+
   dispose() {
-    this.parts.forEach((part) => part.dispose());
-    this.instruments.forEach((inst) => inst?.dispose());
+    this.disposeParts();
     this.effects.forEach((eff) => eff.dispose());
     Tone.Transport.cancel(0);
+    if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
   }
 
   private emitState(state: TonePlayerState) {
