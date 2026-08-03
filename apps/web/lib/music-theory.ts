@@ -150,9 +150,11 @@ export function defaultTrackLayout(style: string): string[] {
 export function defaultPatternType(trackName: string, style: string): string {
   const name = trackName.toLowerCase();
   if (name.includes('drum')) {
-    if (style === 'jarre') return 'electronic_sparse';
+    if (style === 'jarre') return 'jarre_drums';
     if (style === 'ambient') return 'ambient_textures';
     if (style === 'techno') return 'techno_drive';
+    if (style === 'synthwave') return 'synthwave_drive';
+    if (style === 'dance' || style === 'electro' || style === 'edm') return 'dance_guetta';
     return 'four_on_floor';
   }
   if (name.includes('kick')) {
@@ -162,10 +164,10 @@ export function defaultPatternType(trackName: string, style: string): string {
     return style === 'techno' ? 'techno_hats' : 'hihat_16ths';
   }
   if (name.includes('bass')) {
-    if (style === 'jarre') return 'analog_sequence';
+    if (style === 'jarre') return 'jarre_bass';
     if (style === 'synthwave') return 'synthwave_bass';
     if (style === 'techno') return 'techno_bass';
-    if (style === 'dance' || style === 'electro') return 'edm_bass';
+    if (style === 'dance' || style === 'electro' || style === 'edm') return 'edm_bass';
     return 'root_fifth_octave';
   }
   if (name.includes('arpeggio')) {
@@ -182,7 +184,9 @@ export function defaultPatternType(trackName: string, style: string): string {
     return style === 'jarre' ? 'ambient_pad' : 'chords';
   }
   if (name.includes('lead')) {
-    return style === 'jarre' ? 'oxygene_lead' : 'melody';
+    if (style === 'jarre') return 'oxygene_lead';
+    if (style === 'synthwave') return 'synthwave_lead';
+    return 'melody';
   }
   if (name.includes('fx')) return 'fx_markers';
   return 'chords';

@@ -1,6 +1,7 @@
 import * as Tone from 'tone';
 import { Soundfont } from 'smplr';
 import { Project, Track } from '@gravsystem/core';
+import { SynthDrumKit } from './drum-kit';
 
 export interface AudioEngineState {
   isPlaying: boolean;
@@ -29,29 +30,73 @@ function instrumentForTrack(trackName: string): string {
   return 'synth_strings_1';
 }
 
-function createSynthForTrack(trackName: string, _style: string): Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth {
+function createSynthForTrack(trackName: string, style: string): Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth {
   const name = trackName.toLowerCase();
+  const s = style.toLowerCase();
+  const isJarre = s === 'jarre' || s === 'ambient';
+  const isSynthwave = s === 'synthwave';
+  const isDance = s === 'dance' || s === 'electro' || s === 'house' || s === 'edm';
 
   if (name.includes('bass')) {
+    if (isJarre) {
+      return new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.02, decay: 0.35, sustain: 0.5, release: 0.6 },
+        filterEnvelope: { attack: 0.05, decay: 0.4, sustain: 0.35, release: 0.6, baseFrequency: 60, octaves: 3, exponent: 2 },
+        filter: { Q: 1.5, type: 'lowpass', rolloff: -24 },
+      });
+    }
+    if (isSynthwave) {
+      return new Tone.MonoSynth({
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.005, decay: 0.25, sustain: 0.7, release: 0.5 },
+        filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.5, release: 0.4, baseFrequency: 100, octaves: 2.5, exponent: 2 },
+        filter: { Q: 2.5, type: 'lowpass', rolloff: -24 },
+      });
+    }
     return new Tone.MonoSynth({
       oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.01, decay: 0.2, sustain: 0.6, release: 0.4 },
-      filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.4, baseFrequency: 80, octaves: 2.5, exponent: 2 },
-      filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+      envelope: { attack: 0.005, decay: 0.18, sustain: 0.65, release: 0.35 },
+      filterEnvelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.3, baseFrequency: 90, octaves: 2.5, exponent: 2 },
+      filter: { Q: 2.2, type: 'lowpass', rolloff: -24 },
     });
   }
 
   if (name.includes('lead')) {
+    if (isJarre) {
+      return new Tone.DuoSynth({
+        vibratoAmount: 0.15,
+        vibratoRate: 4,
+        harmonicity: 1.25,
+        voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.08, decay: 0.2, sustain: 0.75, release: 0.8 }, filterEnvelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 0.8, baseFrequency: 350, octaves: 2.5 } },
+        voice1: { oscillator: { type: 'triangle' }, envelope: { attack: 0.08, decay: 0.2, sustain: 0.75, release: 0.8 }, filterEnvelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 0.8, baseFrequency: 350, octaves: 2.5 } },
+      });
+    }
+    if (isSynthwave) {
+      return new Tone.DuoSynth({
+        vibratoAmount: 0.05,
+        vibratoRate: 6,
+        harmonicity: 1.5,
+        voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5 }, filterEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 600, octaves: 2 } },
+        voice1: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5 }, filterEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 600, octaves: 2 } },
+      });
+    }
     return new Tone.DuoSynth({
-      vibratoAmount: 0.1,
+      vibratoAmount: 0.08,
       vibratoRate: 5,
       harmonicity: 1.5,
-      voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5 }, filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5, baseFrequency: 400, octaves: 2 } },
-      voice1: { oscillator: { type: 'square' }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5 }, filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5, baseFrequency: 400, octaves: 2 } },
+      voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45 }, filterEnvelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45, baseFrequency: 450, octaves: 2 } },
+      voice1: { oscillator: { type: 'square' }, envelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45 }, filterEnvelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45, baseFrequency: 450, octaves: 2 } },
     });
   }
 
   if (name.includes('pad') || name.includes('string') || name.includes('drone')) {
+    if (isJarre) {
+      return new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'sawtooth' },
+        envelope: { attack: 0.6, decay: 0.3, sustain: 0.85, release: 2.0 },
+      });
+    }
     return new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sawtooth' },
       envelope: { attack: 0.3, decay: 0.2, sustain: 0.8, release: 1.2 },
@@ -59,6 +104,16 @@ function createSynthForTrack(trackName: string, _style: string): Tone.PolySynth 
   }
 
   if (name.includes('arpeggio')) {
+    if (isJarre) {
+      return new Tone.FMSynth({
+        harmonicity: 2,
+        modulationIndex: 6,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.02, decay: 0.2, sustain: 0.4, release: 0.8 },
+        modulation: { type: 'triangle' },
+        modulationEnvelope: { attack: 0.02, decay: 0.2, sustain: 0.3, release: 0.5 },
+      });
+    }
     return new Tone.FMSynth({
       harmonicity: 3,
       modulationIndex: 10,
@@ -70,6 +125,12 @@ function createSynthForTrack(trackName: string, _style: string): Tone.PolySynth 
   }
 
   if (name.includes('chords') || name.includes('stab')) {
+    if (isDance) {
+      return new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'square' },
+        envelope: { attack: 0.005, decay: 0.12, sustain: 0.35, release: 0.25 },
+      });
+    }
     return new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'square' },
       envelope: { attack: 0.02, decay: 0.15, sustain: 0.4, release: 0.4 },
@@ -111,7 +172,7 @@ export class AudioEngine {
   private isStarted = false;
   private parts: Tone.Part[] = [];
   private instruments: Map<string, Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth | Soundfont> = new Map();
-  private drumSampler?: Tone.Sampler;
+  private drumKit?: SynthDrumKit;
   private effects: Tone.ToneAudioNode[] = [];
   private sidechainGains: Map<string, Tone.Gain> = new Map();
   private trackChannels: Map<string, TrackChannel> = new Map();
@@ -164,17 +225,8 @@ export class AudioEngine {
         volume: -12,
       }).connect(limiter);
 
-      // Sidechain source: kick-driven gain reduction
-      // Drum sampler using local WAV samples
-      this.drumSampler = new Tone.Sampler(
-        {
-          C1: '/samples/kick.wav',
-          D1: '/samples/snare.wav',
-          'F#1': '/samples/hihat.wav',
-          A1: '/samples/clap.wav',
-        },
-        { attack: 0, release: 0.1, volume: -2 }
-      );
+      // Synthesized drum kit — no external sample dependencies
+      this.drumKit = new SynthDrumKit();
 
       this.emit({ isReady: true });
     } catch (err) {
@@ -297,12 +349,12 @@ export class AudioEngine {
       this.createTrackChannel(track);
     }
 
-    // Route drum sampler through each drum track channel
+    // Route synthesized drum kit through each drum track channel
     for (const track of project.tracks) {
       if (isDrumTrack(track.name)) {
         const channel = this.trackChannels.get(track.id);
-        if (channel) {
-          this.drumSampler?.connect(channel.gain);
+        if (channel && this.drumKit) {
+          this.drumKit.output.connect(channel.gain);
           channel.gain.connect(channel.panner);
         }
       }
@@ -385,8 +437,7 @@ export class AudioEngine {
         }
 
         const part = new Tone.Part<ScheduledNote>((time, value) => {
-          const sample = drumSampleName(value.note);
-          this.drumSampler?.triggerAttackRelease(sample, value.duration, time, value.velocity);
+          this.drumKit?.trigger(value.note, value.duration, time, value.velocity);
         }, notes);
         part.start(0);
         this.parts.push(part);
@@ -490,22 +541,7 @@ export class AudioEngine {
       channel.panner.dispose();
     });
     this.trackChannels.clear();
-    this.drumSampler?.dispose();
+    this.drumKit?.dispose();
     Tone.Transport.cancel(0);
-  }
-}
-
-function drumSampleName(pitch: number): string {
-  switch (pitch) {
-    case 36:
-      return 'C1';
-    case 38:
-      return 'D1';
-    case 39:
-      return 'A1';
-    case 42:
-      return 'F#1';
-    default:
-      return 'C1';
   }
 }

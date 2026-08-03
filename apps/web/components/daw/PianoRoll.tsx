@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import * as Tone from 'tone';
 import { Region, MidiEvent } from '@gravsystem/core';
 
 export interface PianoRollProps {
@@ -21,6 +22,36 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<MidiEvent[][]>([region.midiEvents]);
   const [historyIndex, setHistoryIndex] = useState(0);
+
+  const previewSynthRef = useRef<Tone.PolySynth | null>(null);
+  const previewStartedRef = useRef(false);
+
+  const ensurePreviewSynth = async () => {
+    if (!previewSynthRef.current) {
+      previewSynthRef.current = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.2 },
+        volume: -8,
+      }).toDestination();
+    }
+    if (!previewStartedRef.current) {
+      await Tone.start();
+      previewStartedRef.current = true;
+    }
+  };
+
+  const playPreview = async (pitch: number, velocity = 100) => {
+    await ensurePreviewSynth();
+    const vel = Math.max(0, Math.min(1, velocity / 127));
+    previewSynthRef.current?.triggerAttackRelease(pitch, '16n', Tone.now(), vel);
+  };
+
+  useEffect(() => {
+    return () => {
+      previewSynthRef.current?.dispose();
+      previewSynthRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     setEvents(region.midiEvents);
@@ -98,6 +129,7 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
       start,
       duration: 0.25,
     };
+    playPreview(pitch, 100);
     commit([...events, newEvent]);
   };
 
@@ -133,6 +165,9 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
     const index = Number(selectedId);
     const clamped = Math.max(1, Math.min(127, Math.round(velocity)));
     const next = events.map((evt, i) => (i === index ? { ...evt, velocity: clamped } : evt));
+    if (selectedEvent) {
+      playPreview(selectedEvent.pitch, clamped);
+    }
     commit(next);
   };
 
@@ -187,6 +222,7 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
     e.stopPropagation();
     e.preventDefault();
     const evt = events[index];
+    playPreview(evt.pitch, evt.velocity);
     dragRef.current = {
       index,
       startX: e.clientX,

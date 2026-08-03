@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { Project } from '@gravsystem/core';
+import { SynthDrumKit } from './drum-kit';
 
 interface ScheduledNote {
   time: number;
@@ -82,62 +83,7 @@ function createOfflineSynthForTrack(trackName: string): Tone.ToneAudioNode {
   });
 }
 
-function drumSampleName(pitch: number): string {
-  switch (pitch) {
-    case 36:
-      return 'C1';
-    case 38:
-      return 'D1';
-    case 39:
-      return 'A1';
-    case 42:
-      return 'F#1';
-    default:
-      return 'C1';
-  }
-}
 
-function createOfflineDrums(): { sampler: Tone.Sampler; trigger: (time: number, note: number, duration: number, velocity: number) => void } {
-  // Use a tiny synthesized kit so offline rendering is deterministic and dependency-free.
-  const kick = new Tone.MembraneSynth({
-    pitchDecay: 0.05,
-    octaves: 4,
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.4 },
-  });
-  const snare = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 },
-  });
-  const hihat = new Tone.MetalSynth({
-    envelope: { attack: 0.001, decay: 0.05, release: 0.05 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5,
-  });
-  const clap = new Tone.NoiseSynth({
-    noise: { type: 'pink' },
-    envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.15 },
-  });
-
-  return {
-    sampler: new Tone.Sampler({}),
-    trigger: (time: number, note: number, duration: number, velocity: number) => {
-      const vel = Math.max(0, Math.min(1, velocity));
-      const sample = drumSampleName(note);
-      if (sample === 'C1') {
-        kick.triggerAttackRelease('C1', duration, time, vel);
-      } else if (sample === 'D1') {
-        snare.triggerAttackRelease(duration, time, vel);
-      } else if (sample === 'F#1') {
-        hihat.triggerAttackRelease(duration, time, vel * 0.7);
-      } else if (sample === 'A1') {
-        clap.triggerAttackRelease(duration, time, vel);
-      }
-    },
-  };
-}
 
 interface ReadableAudioBuffer {
   numberOfChannels: number;
@@ -216,7 +162,7 @@ export async function renderProjectToWav(project: Project): Promise<Blob> {
       highFrequency: 4000,
     }).connect(compressor);
 
-    const drums = createOfflineDrums();
+    const drums = new SynthDrumKit();
 
     for (const track of project.tracks) {
       const notes: ScheduledNote[] = track.regions.flatMap((region) =>
@@ -235,7 +181,7 @@ export async function renderProjectToWav(project: Project): Promise<Blob> {
 
       if (isDrumTrack(track.name)) {
         const part = new Tone.Part<ScheduledNote>((time, value) => {
-          drums.trigger(time, value.note, value.duration, value.velocity);
+          drums.trigger(value.note, value.duration, time, value.velocity);
         }, notes);
         part.start(0);
       } else {

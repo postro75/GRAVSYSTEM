@@ -117,6 +117,26 @@ export function generateDrumPattern(
       if (isKickStep) add(step, DRUM_NOTES.kick, 120 * intensity, 0.5);
       add(step, DRUM_NOTES.hihatClosed, step % 2 === 0 ? 65 : 50, 0.2);
       if (isBackbeat) add(step, DRUM_NOTES.snare, 105 * intensity + rng() * 10, 0.4);
+    } else if (patternType === 'jarre_drums') {
+      // Oxygène-style: sparse kick, backbeat snare, open hats on the offbeat.
+      if (step % 8 === 0) add(step, DRUM_NOTES.kick, 95 * intensity, 1.0);
+      if (step % 8 === 4) add(step, DRUM_NOTES.snare, 80 * intensity, 0.6);
+      if (step % 4 === 2) add(step, DRUM_NOTES.hihatOpen, 55 * intensity, 0.8);
+      if (step === 14) add(step, DRUM_NOTES.snare, 70 * intensity, 0.4);
+    } else if (patternType === 'synthwave_drive') {
+      // Four-on-the-floor with gated snare and 16th hats.
+      if (isKickStep && !kickOnly) add(step, DRUM_NOTES.kick, 110 * intensity, 0.55);
+      if (isBackbeat) add(step, DRUM_NOTES.snare, 105 * intensity, 0.7);
+      if (step % 2 === 0) add(step, DRUM_NOTES.hihatClosed, 60 * intensity + rng() * 10, 0.2);
+      if (isOffbeat) add(step, DRUM_NOTES.hihatOpen, 70 * intensity, 0.3);
+    } else if (patternType === 'dance_guetta') {
+      // Driving EDM: four-on-floor, clap on 2/4, 16th hats, fills every 4 bars.
+      if (isKickStep && !kickOnly) add(step, DRUM_NOTES.kick, 120 * intensity, 0.5);
+      if (isBackbeat) add(step, DRUM_NOTES.clap, 110 * intensity, 0.45);
+      add(step, DRUM_NOTES.hihatClosed, 55 * intensity + rng() * 15, 0.15);
+      if (isFill && step > 10 && step % 2 === 0) {
+        add(step, DRUM_NOTES.snare, 95 * intensity + rng() * 20, 0.35);
+      }
     } else if (patternType === 'electronic_sparse') {
       if (step % 8 === 0) add(step, DRUM_NOTES.kick, 90 * intensity, 0.8);
       if (step % 8 === 4) add(step, DRUM_NOTES.snare, 75 * intensity, 0.5);
@@ -209,6 +229,12 @@ export function generateBassPattern(
   } else if (patternType === 'edm_bass') {
     add(0, rootMidi(2), 115 * intensity, 7.5);
     add(8, fifthMidi(2), 105 * intensity, 7.5);
+  } else if (patternType === 'jarre_bass') {
+    // Slow, hypnotic root-fifth with longer sustain.
+    add(0, rootMidi(2), 95 * intensity, 7);
+    if (ctx.barIndex % 2 === 1) {
+      add(8, fifthMidi(2), 85 * intensity, 7);
+    }
   } else {
     add(0, rootMidi(2), 100 * intensity, 8);
   }
@@ -377,6 +403,15 @@ export function generateLeadPattern(
           (80 + rng() * 20) * intensity
         );
       }
+    }
+  } else if (patternType === 'synthwave_lead') {
+    // Wide, anthemic lead line with held notes and short fills.
+    const phraseLength = section === 'intro' || section === 'outro' ? 4 : 8;
+    const stepTicks = barTicks / phraseLength;
+    const note = shifted[ctx.barIndex % shifted.length];
+    add(0, stepTicks * (phraseLength - 1), note, 75 * intensity);
+    if (section === 'drop' && ctx.barIndex % 2 === 1) {
+      add(stepTicks * 6, stepTicks * 2, shifted[(ctx.barIndex + 2) % shifted.length], 80 * intensity);
     }
   } else {
     const note = shifted[ctx.barIndex % shifted.length];
