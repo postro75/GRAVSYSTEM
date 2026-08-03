@@ -50,6 +50,11 @@
   - Pliki deploymentowe: `apps/api/Dockerfile`, `apps/api/Procfile`, `render.yaml`.
   - `docs/Phase 3 ROI Critique.md`.
   - **Bloker:** FastAPI nie wdrożony na Render/AWS z powodu braku credentials.
+- **Phase 3b — Local-first desktop MVP pivot:**
+  - MIDI export przeniesiony do przeglądarki (`@tonejs/midi`), działa offline.
+  - Persistencja projektów w `localStorage` z auto-save i ostatnim projektem.
+  - Desktop wrapper Electron (`apps/web/electron/` + `npm run electron:dev`).
+  - `docs/Phase 3b ROI Critique.md`.
 
 ## Wymagane zmienne środowiskowe
 

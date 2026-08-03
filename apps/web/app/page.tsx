@@ -10,6 +10,8 @@ import { GenerationForm } from '@/components/GenerationForm';
 import { GenerationRequest } from '@/lib/types';
 import { Project, ProjectSchema, Region } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
+import { downloadMidi } from '@/lib/midi-export';
+import { loadProjects, saveProjects, loadLastProjectId, saveLastProjectId } from '@/lib/storage';
 import { Loader2, Download } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
@@ -30,6 +32,7 @@ export default function Home() {
   const [dawProject, setDawProject] = useState<Project | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [playerState, setPlayerState] = useState<AudioEngineState>({
     isPlaying: false,
     isReady: false,
@@ -61,6 +64,30 @@ export default function Home() {
       playerRef.current = null;
     };
   }, []);
+
+  // Load persisted projects on mount
+  useEffect(() => {
+    const stored = loadProjects();
+    const lastId = loadLastProjectId();
+    setProjects(stored);
+    if (lastId) {
+      const last = stored.find((p) => p.id === lastId);
+      if (last) {
+        setDawProject(last);
+        playerRef.current?.loadProject(last);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Persist projects whenever they change
+  useEffect(() => {
+    if (!isLoaded) return;
+    saveProjects(projects);
+    if (dawProject) {
+      saveLastProjectId(dawProject.id);
+    }
+  }, [projects, dawProject, isLoaded]);
 
   const runGeneration = async (request: GenerationRequest) => {
     setIsGenerating(true);
@@ -124,26 +151,10 @@ export default function Home() {
     await playerRef.current?.loadProject(nextProject);
   };
 
-  const handleExportMidi = async () => {
+  const handleExportMidi = () => {
     if (!dawProject) return;
     try {
-      const res = await fetch(apiPath('/api/export/midi'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dawProject),
-      });
-      if (!res.ok) {
-        throw new Error('MIDI export failed');
-      }
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${dawProject.title.replace(/\s+/g, '_')}.mid`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      downloadMidi(dawProject);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
     }
@@ -200,15 +211,24 @@ export default function Home() {
               <p className="text-sm text-apple-muted">No projects yet. Generate one above.</p>
             ) : (
               projects.map((project) => (
-                <div
+                <button
                   key={project.id}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
+                  type="button"
+                  onClick={() => {
+                    setDawProject(project);
+                    playerRef.current?.loadProject(project);
+                  }}
+                  className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition ${
+                    dawProject?.id === project.id
+                      ? 'border-apple-accent/50 bg-apple-accent/10'
+                      : 'border-white/10 bg-white/5 hover:bg-white/[0.07]'
+                  }`}
                 >
                   <div className="font-medium text-apple-text">{project.title}</div>
                   <div className="text-apple-muted">
                     {project.bpm} BPM · {project.key} {project.scale} · {project.tracks.length} tracks
                   </div>
-                </div>
+                </button>
               ))
             )}
           </div>

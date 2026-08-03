@@ -39,6 +39,6 @@ export default [
     },
   },
   {
-    ignores: ['.next/', 'node_modules/', 'dist/', '*.js'],
+    ignores: ['.next/', 'node_modules/', 'dist/', '**/*.js', 'electron/'],
   },
 ];
