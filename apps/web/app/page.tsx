@@ -7,18 +7,20 @@ import { Transport } from '@/components/daw/Transport';
 import { Timeline } from '@/components/daw/Timeline';
 import { PianoRoll } from '@/components/daw/PianoRoll';
 import { GenerationForm } from '@/components/GenerationForm';
-import { GenerationRequest } from '@/lib/types';
+import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
 import { Project, ProjectSchema, Region } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
-import { loadProjects, saveProjects, loadLastProjectId, saveLastProjectId } from '@/lib/storage';
-import { Loader2, Download } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-
-function apiPath(path: string): string {
-  return `${API_URL}${path}`;
-}
+import { generateProject } from '@/lib/generator';
+import {
+  loadProjects,
+  saveProjects,
+  loadLastProjectId,
+  saveLastProjectId,
+  exportProjectsJson,
+  importProjectsJson,
+} from '@/lib/storage';
+import { Loader2, Download, Upload, FolderOpen } from 'lucide-react';
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -67,17 +69,24 @@ export default function Home() {
 
   // Load persisted projects on mount
   useEffect(() => {
-    const stored = loadProjects();
-    const lastId = loadLastProjectId();
-    setProjects(stored);
-    if (lastId) {
-      const last = stored.find((p) => p.id === lastId);
-      if (last) {
-        setDawProject(last);
-        playerRef.current?.loadProject(last);
+    let cancelled = false;
+    (async () => {
+      const stored = await loadProjects();
+      const lastId = await loadLastProjectId();
+      if (cancelled) return;
+      setProjects(stored);
+      if (lastId) {
+        const last = stored.find((p) => p.id === lastId);
+        if (last) {
+          setDawProject(last);
+          playerRef.current?.loadProject(last);
+        }
       }
-    }
-    setIsLoaded(true);
+      setIsLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Persist projects whenever they change
@@ -89,30 +98,22 @@ export default function Home() {
     }
   }, [projects, dawProject, isLoaded]);
 
-  const runGeneration = async (request: GenerationRequest) => {
+  const runGeneration = async (request: FormGenerationRequest) => {
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch(apiPath('/api/generate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: request.description,
-          style: request.style,
-          bpm: request.bpm,
-          key: request.key,
-          scale: request.scale,
-          bars: request.bars,
-        }),
+      const project = generateProject({
+        description: request.description,
+        style: request.style,
+        bpm: request.bpm,
+        key: request.key,
+        scale: request.scale,
+        bars: request.bars,
       });
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Generation failed');
-      }
-      const project = ProjectSchema.parse(data.project);
-      setProjects((prev) => [project, ...prev]);
-      setDawProject(project);
-      await playerRef.current?.loadProject(project);
+      const validated = ProjectSchema.parse(project);
+      setProjects((prev) => [validated, ...prev]);
+      setDawProject(validated);
+      await playerRef.current?.loadProject(validated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -129,7 +130,7 @@ export default function Home() {
     runGeneration({ description, style, outputType: 'mid' });
   };
 
-  const handleClassicGenerate = (request: GenerationRequest) => runGeneration(request);
+  const handleClassicGenerate = (request: FormGenerationRequest) => runGeneration(request);
 
   const handlePlay = () => playerRef.current?.play();
   const handlePause = () => playerRef.current?.pause();
@@ -160,6 +161,37 @@ export default function Home() {
     }
   };
 
+  const handleExportJson = async () => {
+    try {
+      const json = await exportProjectsJson();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gravsystem-projects-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
+  const handleImportJson = async (file: File) => {
+    try {
+      const text = await file.text();
+      const imported = await importProjectsJson(text);
+      setProjects(imported);
+      if (imported[0]) {
+        setDawProject(imported[0]);
+        await playerRef.current?.loadProject(imported[0]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed');
+    }
+  };
+
   return (
     <div className="flex h-screen flex-col bg-apple-bg">
       <Header />
@@ -176,6 +208,28 @@ export default function Home() {
         />
 
         <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={handleExportJson}
+            disabled={projects.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+          >
+            <FolderOpen size={14} />
+            Export JSON
+          </button>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10">
+            <Upload size={14} />
+            Import JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImportJson(file);
+                e.currentTarget.value = '';
+              }}
+            />
+          </label>
           <button
             onClick={handleExportMidi}
             disabled={!dawProject}

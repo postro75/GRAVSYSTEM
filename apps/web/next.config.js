@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
-/** @type {import('next').NextConfig} */
+const isElectron = process.env.ELECTRON_BUILD === '1';
+
 const nextConfig = {
-  output: 'standalone',
+  output: isElectron ? 'export' : 'standalone',
+  distDir: isElectron ? 'dist' : '.next',
   transpilePackages: ['@gravsystem/core'],
   async rewrites() {
     return [
@@ -12,10 +14,6 @@ const nextConfig = {
       {
         source: '/api/schema/:path*',
         destination: `${process.env.API_URL || 'http://localhost:8000'}/api/schema/:path*`,
-      },
-      {
-        source: '/api/generate',
-        destination: `${process.env.API_URL || 'http://localhost:8000'}/api/generate`,
       },
     ];
   },

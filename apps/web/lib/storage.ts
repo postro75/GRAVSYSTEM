@@ -1,34 +1,32 @@
 import { Project } from '@gravsystem/core';
+import {
+  loadProjects as loadProjectsDb,
+  saveProjects as saveProjectsDb,
+  saveProject as saveProjectDb,
+  loadLastProjectId as loadLastProjectIdDb,
+  saveLastProjectId as saveLastProjectIdDb,
+  exportProjectsJson,
+  importProjectsJson,
+} from './db';
 
-const STORAGE_KEY = 'gravsystem:projects';
-const LAST_PROJECT_KEY = 'gravsystem:lastProjectId';
-
-export function loadProjects(): Project[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as Project[];
-  } catch {
-    return [];
-  }
+export function loadProjects(): Promise<Project[]> {
+  return loadProjectsDb();
 }
 
-export function saveProjects(projects: Project[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  } catch {
-    // ignore storage errors
-  }
+export function saveProjects(projects: Project[]): Promise<void> {
+  return saveProjectsDb(projects);
 }
 
-export function loadLastProjectId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(LAST_PROJECT_KEY);
+export function saveProject(project: Project): Promise<void> {
+  return saveProjectDb(project);
 }
 
-export function saveLastProjectId(id: string) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(LAST_PROJECT_KEY, id);
+export function loadLastProjectId(): Promise<string | null> {
+  return loadLastProjectIdDb();
 }
+
+export function saveLastProjectId(id: string): Promise<void> {
+  return saveLastProjectIdDb(id);
+}
+
+export { exportProjectsJson, importProjectsJson };

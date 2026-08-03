@@ -1,95 +1,59 @@
-import { buildConfig } from './music';
-import { generateMidiEvents } from './midi';
-import { MusicConfig } from './types';
-import { Project, ProjectSchema, Track, MidiEvent, createProject } from '@gravsystem/core';
+import { Project, Track, createProject, createTrack, createRegion, GenerationRequest } from '@gravsystem/core';
+import { buildConfig } from './music-theory';
+import { generateMidiEvents, eventsToMidiEvents } from './pattern-generator';
 
-export interface GenerateOptions {
-  description: string;
-  style?: string;
-  bpm?: number;
-  key?: string;
-  scale?: 'major' | 'minor';
-  bars?: number;
-}
+export function generateProject(request: GenerationRequest): Project {
+  const config = buildConfig(request.description, {
+    style: request.style,
+    bpm: request.bpm,
+    key: request.key,
+    scale: request.scale,
+    bars: request.bars,
+  });
 
-export function generateProjectFromDescription(options: GenerateOptions): Project {
-  const config: MusicConfig = {
-    ...buildConfig(options.description, {
-      style: options.style,
-      bpm: options.bpm,
-      bars: options.bars,
-      key: options.key,
-      scale: options.scale,
-    }),
-    description: options.description,
-  };
+  const midiEvents = generateMidiEvents(config);
+  const tracks: Track[] = [];
 
-  const eventsByTrack = generateMidiEvents(config);
-  const project = createProject({
-    title: options.description.slice(0, 60) || 'Generated Project',
-    description: options.description,
+  for (const [trackName, events] of Object.entries(midiEvents)) {
+    const track = createTrack({
+      name: trackName,
+      type: 'midi',
+      instrument: instrumentForTrack(trackName),
+      channel: tracks.length + 1,
+    });
+
+    if (events.length > 0) {
+      const startTick = Math.min(...events.map((e) => e.time));
+      const endTick = Math.max(...events.map((e) => e.time + e.duration));
+      const durationBeats = (endTick - startTick) / 480;
+
+      const region = createRegion({
+        trackId: track.id,
+        name: `${trackName} Clip`,
+        duration: durationBeats,
+        type: 'midi',
+        midiEvents: eventsToMidiEvents(events),
+      });
+
+      track.regions.push(region);
+    }
+
+    tracks.push(track);
+  }
+
+  return createProject({
+    title: config.description.slice(0, 60) || 'Generated Project',
+    description: config.description,
+    style: config.style,
     bpm: config.bpm,
     key: config.key,
     scale: config.scale,
     bars: config.bars,
+    tracks,
   });
-
-  const tracks: Track[] = [];
-  let channel = 1;
-
-  for (const [trackName, events] of eventsByTrack) {
-    const track = _buildTrack(trackName, events, channel);
-    tracks.push(track);
-    channel += 1;
-  }
-
-  project.tracks = tracks;
-  return ProjectSchema.parse(project);
 }
 
-function _buildTrack(trackName: string, events: import('./midi').MidiEvent[], channel: number): Track {
-  const midiEvents: MidiEvent[] = events.map((evt) => ({
-    pitch: evt.note,
-    velocity: evt.velocity,
-    start: evt.time / 480,
-    duration: evt.duration / 480,
-  }));
-
-  const endBeat = midiEvents.length > 0
-    ? Math.max(...midiEvents.map((e) => e.start + e.duration))
-    : 0;
-
-  return {
-    id: crypto.randomUUID(),
-    name: trackName,
-    type: 'midi',
-    instrument: _instrumentForTrack(trackName),
-    channel,
-    regions:
-      midiEvents.length > 0
-        ? [
-            {
-              id: crypto.randomUUID(),
-              trackId: crypto.randomUUID(),
-              name: `${trackName} Clip`,
-              startBeat: 0,
-              duration: endBeat,
-              type: 'midi',
-              midiEvents,
-              transpose: 0,
-              gain: 1,
-            },
-          ]
-        : [],
-    volume: 1,
-    pan: 0,
-    mute: false,
-    solo: false,
-    effects: [],
-  };
-}
-
-function _instrumentForTrack(trackName: string): string {
+function instrumentForTrack(trackName: string): string {
   const name = trackName.toLowerCase();
   if (name.includes('drum') || name.includes('kick') || name.includes('hat')) return 'drums';
   if (name.includes('bass')) return 'bass';

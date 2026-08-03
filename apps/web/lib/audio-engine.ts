@@ -133,14 +133,20 @@ export class AudioEngine {
       await Tone.start();
       this.isStarted = true;
 
-      // Master effects chain
-      const reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.02, wet: 0.25 }).toDestination();
+      // Master effects chain: time effects -> EQ -> dynamics -> safety limiter
+      const limiter = new Tone.Limiter(-0.5).toDestination();
+      const compressor = new Tone.Compressor(-20, 3.5).connect(limiter);
+      const eq = new Tone.EQ3({
+        low: -2,
+        mid: 1.5,
+        high: -1,
+        lowFrequency: 250,
+        highFrequency: 4000,
+      }).connect(compressor);
+      const reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.02, wet: 0.25 }).connect(eq);
       const delay = new Tone.FeedbackDelay('8n.', 0.28).connect(reverb);
       const chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.35 }).connect(delay);
-      const compressor = new Tone.Compressor(-18, 3).connect(chorus);
-      const limiter = new Tone.Limiter(-1).toDestination();
-      compressor.connect(limiter);
-      this.effects = [reverb, delay, chorus, compressor, limiter];
+      this.effects = [chorus, delay, reverb, eq, compressor, limiter];
 
       // Sidechain source: kick-driven gain reduction
       // Drum sampler using local WAV samples
@@ -152,7 +158,7 @@ export class AudioEngine {
           A1: '/samples/clap.wav',
         },
         { attack: 0, release: 0.1, volume: -2 }
-      ).connect(limiter);
+      ).connect(eq);
 
       this.emit({ isReady: true });
     } catch (err) {

@@ -10,7 +10,7 @@ import {
   detectKeyScale,
   detectStyle,
   buildConfig,
-} from '@/lib/music';
+} from '@/lib/music-theory';
 
 describe('music theory', () => {
   it('parses chord names to MIDI notes', () => {
@@ -30,7 +30,7 @@ describe('music theory', () => {
 
   it('detects BPM from description', () => {
     expect(detectBpm('128 BPM dance track')).toBe(128);
-    expect(detectBpm('slow ambient')).toBeNull();
+    expect(detectBpm('slow ambient')).toBeUndefined();
   });
 
   it('detects bars from description', () => {
