@@ -1,23 +1,27 @@
 'use client';
 
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Pause, Square, Bell } from 'lucide-react';
 
 export interface TransportProps {
   isPlaying?: boolean;
   bpm?: number;
   position?: string;
+  metronomeEnabled?: boolean;
   onPlay?: () => void;
   onPause?: () => void;
   onStop?: () => void;
+  onMetronomeToggle?: () => void;
 }
 
 export function Transport({
   isPlaying = false,
   bpm = 120,
   position = '00:00:00',
+  metronomeEnabled = false,
   onPlay,
   onPause,
   onStop,
+  onMetronomeToggle,
 }: TransportProps) {
   return (
     <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-md">
@@ -43,6 +47,17 @@ export function Transport({
           className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-apple-text hover:bg-white/5"
         >
           <Square size={14} fill="currentColor" />
+        </button>
+        <button
+          onClick={onMetronomeToggle}
+          title="Toggle metronome"
+          className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+            metronomeEnabled
+              ? 'border-apple-accent bg-apple-accent text-white'
+              : 'border-white/10 text-apple-text hover:bg-white/5'
+          }`}
+        >
+          <Bell size={14} />
         </button>
       </div>
 

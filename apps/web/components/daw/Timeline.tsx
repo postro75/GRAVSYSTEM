@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { Track, Region } from '@gravsystem/core';
-import { ZoomIn, ZoomOut, MoveHorizontal } from 'lucide-react';
+import { ZoomIn, ZoomOut, MoveHorizontal, Copy, Trash2 } from 'lucide-react';
 
 export interface TimelineProps {
   tracks?: Track[];
@@ -11,6 +11,8 @@ export interface TimelineProps {
   bpm?: number;
   onRegionClick?: (track: Track, region: Region) => void;
   onRegionChange?: (updatedRegion: Region) => void;
+  onRegionDuplicate?: (region: Region) => void;
+  onRegionDelete?: (region: Region) => void;
 }
 
 export function Timeline({
@@ -20,6 +22,8 @@ export function Timeline({
   bpm = 120,
   onRegionClick,
   onRegionChange,
+  onRegionDuplicate,
+  onRegionDelete,
 }: TimelineProps) {
   const [beatWidth, setBeatWidth] = useState(40);
   const [draggingRegion, setDraggingRegion] = useState<{
@@ -176,7 +180,35 @@ export function Timeline({
                       onClick={() => onRegionClick?.(track, region)}
                       onPointerDown={(e) => handlePointerDown(e, track, region, 'move')}
                     >
-                      <div className="truncate px-1.5 py-1 text-[10px] text-apple-text">{region.name}</div>
+                      <div className="flex items-center justify-between px-1.5 py-1">
+                        <div className="truncate text-[10px] text-apple-text">{region.name}</div>
+                        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                          <button
+                            type="button"
+                            title="Duplicate region"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRegionDuplicate?.(region);
+                            }}
+                            className="rounded p-0.5 text-apple-text hover:bg-white/20"
+                          >
+                            <Copy size={10} />
+                          </button>
+                          <button
+                            type="button"
+                            title="Delete region"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRegionDelete?.(region);
+                            }}
+                            className="rounded p-0.5 text-apple-danger hover:bg-white/20"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      </div>
                       {/* Resize handle */}
                       <div
                         className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize bg-white/20 opacity-0 transition group-hover:opacity-100"

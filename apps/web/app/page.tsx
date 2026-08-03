@@ -13,6 +13,7 @@ import { Project, ProjectSchema, Region, Track } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
 import { downloadRpp } from '@/lib/rpp-export';
+import { renderProjectToWav, downloadWav } from '@/lib/audio-export';
 import { generateProject } from '@/lib/generator';
 import {
   loadProjects,
@@ -45,6 +46,8 @@ export default function Home() {
   });
   const [position, setPosition] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -154,6 +157,45 @@ export default function Home() {
     await playerRef.current?.loadProject(nextProject);
   };
 
+  const handleRegionDuplicate = async (region: Region) => {
+    if (!dawProject) return;
+    const newRegion: Region = {
+      ...region,
+      id: crypto.randomUUID(),
+      startBeat: region.startBeat + region.duration,
+    };
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.regions.some((r) => r.id === region.id)
+          ? { ...track, regions: [...track.regions, newRegion] }
+          : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+    await playerRef.current?.loadProject(nextProject);
+  };
+
+  const handleRegionDelete = async (region: Region) => {
+    if (!dawProject) return;
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) => ({
+        ...track,
+        regions: track.regions.filter((r) => r.id !== region.id),
+      })),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+    if (selectedRegion?.id === region.id) {
+      setSelectedRegion(null);
+    }
+    await playerRef.current?.loadProject(nextProject);
+  };
+
   const handleTrackChange = (
     trackId: string,
     updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>
@@ -180,6 +222,26 @@ export default function Home() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
     }
+  };
+
+  const handleExportWav = async () => {
+    if (!dawProject) return;
+    setIsRendering(true);
+    setError(null);
+    try {
+      const blob = await renderProjectToWav(dawProject);
+      downloadWav(blob, `${dawProject.title}.wav`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'WAV export failed');
+    } finally {
+      setIsRendering(false);
+    }
+  };
+
+  const handleToggleMetronome = () => {
+    const next = !metronomeEnabled;
+    setMetronomeEnabled(next);
+    playerRef.current?.setMetronome(next);
   };
 
   const handleExportRpp = () => {
@@ -232,9 +294,11 @@ export default function Home() {
           isPlaying={playerState.isPlaying}
           bpm={dawProject?.bpm ?? 120}
           position={formatTime(position)}
+          metronomeEnabled={metronomeEnabled}
           onPlay={handlePlay}
           onPause={handlePause}
           onStop={handleStop}
+          onMetronomeToggle={handleToggleMetronome}
         />
 
         <div className="flex items-center justify-end gap-2">
@@ -276,6 +340,14 @@ export default function Home() {
             <Download size={14} />
             Export MIDI
           </button>
+          <button
+            onClick={handleExportWav}
+            disabled={!dawProject || isRendering}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+          >
+            {isRendering ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Export WAV
+          </button>
         </div>
 
         <div className="min-h-0 flex-1">
@@ -286,6 +358,8 @@ export default function Home() {
             bpm={dawProject?.bpm ?? 120}
             onRegionClick={(_, region) => setSelectedRegion(region)}
             onRegionChange={handleRegionChange}
+            onRegionDuplicate={handleRegionDuplicate}
+            onRegionDelete={handleRegionDelete}
           />
         </div>
 

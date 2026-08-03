@@ -126,6 +126,16 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
     commit(next);
   };
 
+  const selectedEvent = selectedId !== null ? events[Number(selectedId)] : undefined;
+
+  const setVelocity = (velocity: number) => {
+    if (selectedId === null) return;
+    const index = Number(selectedId);
+    const clamped = Math.max(1, Math.min(127, Math.round(velocity)));
+    const next = events.map((evt, i) => (i === index ? { ...evt, velocity: clamped } : evt));
+    commit(next);
+  };
+
   // Note dragging
   const dragRef = useRef<{
     index: number;
@@ -220,6 +230,20 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
             >
               Extend note
             </button>
+            {selectedEvent && (
+              <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
+                <span className="text-xs text-apple-muted">Vel</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={127}
+                  value={selectedEvent.velocity}
+                  onChange={(e) => setVelocity(Number(e.target.value))}
+                  className="h-1 w-24 cursor-pointer appearance-none rounded bg-white/10 accent-apple-accent"
+                />
+                <span className="w-8 text-right text-xs text-apple-text">{selectedEvent.velocity}</span>
+              </div>
+            )}
             <button
               onClick={onClose}
               className="rounded-lg bg-apple-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-apple-accent/90"
@@ -275,7 +299,7 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
                     width: Math.max(4, evt.duration * BEAT_WIDTH),
                     touchAction: 'none',
                   }}
-                  title={`Pitch ${evt.pitch} · start ${evt.start.toFixed(2)} · dur ${evt.duration.toFixed(2)}`}
+                  title={`Pitch ${evt.pitch} · start ${evt.start.toFixed(2)} · dur ${evt.duration.toFixed(2)} · vel ${evt.velocity}`}
                 />
               );
             })}

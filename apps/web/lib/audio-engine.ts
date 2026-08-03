@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { Soundfont, DrumMachine } from 'smplr';
+import { Soundfont } from 'smplr';
 import { Project, Track } from '@gravsystem/core';
 
 export interface AudioEngineState {
@@ -21,79 +21,76 @@ const GM_INSTRUMENTS: Record<string, string> = {
   fx: 'fx_8_scifi',
 };
 
-const STYLE_INSTRUMENTS: Record<string, Partial<Record<keyof typeof GM_INSTRUMENTS, string>>> = {
-  jarre: {
-    bass: 'synth_bass_1',
-    pad: 'pad_2_warm',
-    string: 'synth_strings_1',
-    drone: 'pad_4_choir',
-    arpeggio: 'marimba',
-    chords: 'pad_2_warm',
-    stab: 'synth_brass_1',
-    lead: 'lead_2_sawtooth',
-    fx: 'fx_8_scifi',
-  },
-  synthwave: {
-    bass: 'synth_bass_1',
-    pad: 'synth_strings_1',
-    arpeggio: 'synth_bell',
-    chords: 'electric_piano_1',
-    stab: 'synth_brass_1',
-    lead: 'lead_8_bass_lead',
-  },
-  techno: {
-    bass: 'synth_bass_2',
-    pad: 'pad_5_bowed',
-    arpeggio: 'vibraphone',
-    chords: 'pad_6_metallic',
-    stab: 'synth_brass_2',
-    lead: 'lead_2_sawtooth',
-  },
-  dance: {
-    bass: 'synth_bass_2',
-    pad: 'string_ensemble_1',
-    arpeggio: 'marimba',
-    chords: 'electric_piano_1',
-    stab: 'synth_brass_1',
-    lead: 'lead_2_sawtooth',
-  },
-  electro: {
-    bass: 'synth_bass_2',
-    pad: 'pad_3_polysynth',
-    arpeggio: 'synth_bell',
-    chords: 'electric_piano_1',
-    stab: 'synth_brass_1',
-    lead: 'lead_2_sawtooth',
-  },
-  house: {
-    bass: 'synth_bass_1',
-    pad: 'pad_2_warm',
-    arpeggio: 'vibraphone',
-    chords: 'electric_piano_1',
-    stab: 'synth_brass_1',
-    lead: 'lead_2_sawtooth',
-  },
-  ambient: {
-    bass: 'acoustic_bass',
-    pad: 'pad_1_new_age',
-    drone: 'choir_aahs',
-    arpeggio: 'vibraphone',
-    chords: 'pad_2_warm',
-    lead: 'lead_3_calliope',
-  },
-};
-
-function instrumentForTrack(trackName: string, style: string): string {
+function instrumentForTrack(trackName: string): string {
   const name = trackName.toLowerCase();
-  const styleMap = STYLE_INSTRUMENTS[style] ?? {};
-
-  for (const [key, value] of Object.entries(styleMap)) {
-    if (name.includes(key) && value) return value;
-  }
   for (const [key, value] of Object.entries(GM_INSTRUMENTS)) {
     if (name.includes(key)) return value;
   }
   return 'synth_strings_1';
+}
+
+function createSynthForTrack(trackName: string, _style: string): Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth {
+  const name = trackName.toLowerCase();
+
+  if (name.includes('bass')) {
+    return new Tone.MonoSynth({
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.01, decay: 0.2, sustain: 0.6, release: 0.4 },
+      filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.4, release: 0.4, baseFrequency: 80, octaves: 2.5, exponent: 2 },
+      filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+    });
+  }
+
+  if (name.includes('lead')) {
+    return new Tone.DuoSynth({
+      vibratoAmount: 0.1,
+      vibratoRate: 5,
+      harmonicity: 1.5,
+      voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5 }, filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5, baseFrequency: 400, octaves: 2 } },
+      voice1: { oscillator: { type: 'square' }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5 }, filterEnvelope: { attack: 0.05, decay: 0.1, sustain: 0.7, release: 0.5, baseFrequency: 400, octaves: 2 } },
+    });
+  }
+
+  if (name.includes('pad') || name.includes('string') || name.includes('drone')) {
+    return new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.3, decay: 0.2, sustain: 0.8, release: 1.2 },
+    });
+  }
+
+  if (name.includes('arpeggio')) {
+    return new Tone.FMSynth({
+      harmonicity: 3,
+      modulationIndex: 10,
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5 },
+      modulation: { type: 'square' },
+      modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.3 },
+    });
+  }
+
+  if (name.includes('chords') || name.includes('stab')) {
+    return new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'square' },
+      envelope: { attack: 0.02, decay: 0.15, sustain: 0.4, release: 0.4 },
+    });
+  }
+
+  // Fallback
+  return new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.5 },
+  });
+}
+
+export type VoiceType = 'custom' | 'soundfont';
+
+function voiceTypeForTrack(trackName: string): VoiceType {
+  const name = trackName.toLowerCase();
+  if (name.includes('bass') || name.includes('lead') || name.includes('pad') || name.includes('string') || name.includes('drone') || name.includes('arpeggio') || name.includes('chords') || name.includes('stab')) {
+    return 'custom';
+  }
+  return 'soundfont';
 }
 
 function isDrumTrack(trackName: string): boolean {
@@ -113,14 +110,16 @@ export class AudioEngine {
   private onStateChange?: (state: AudioEngineState) => void;
   private isStarted = false;
   private parts: Tone.Part[] = [];
-  private instruments: Map<string, Soundfont> = new Map();
-  private drumMachine?: DrumMachine;
+  private instruments: Map<string, Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth | Soundfont> = new Map();
   private drumSampler?: Tone.Sampler;
   private effects: Tone.ToneAudioNode[] = [];
   private sidechainGains: Map<string, Tone.Gain> = new Map();
   private trackChannels: Map<string, TrackChannel> = new Map();
   private loadingCount = 0;
   private loadedCount = 0;
+  private metronome?: Tone.MembraneSynth;
+  private metronomePart?: Tone.Part;
+  private metronomeEnabled = false;
 
   constructor(onStateChange?: (state: AudioEngineState) => void) {
     this.onStateChange = onStateChange;
@@ -156,6 +155,15 @@ export class AudioEngine {
       const chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.35 }).connect(delay);
       this.effects = [chorus, delay, reverb, eq, compressor, limiter];
 
+      // Metronome
+      this.metronome = new Tone.MembraneSynth({
+        pitchDecay: 0.008,
+        octaves: 2,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
+        volume: -12,
+      }).connect(limiter);
+
       // Sidechain source: kick-driven gain reduction
       // Drum sampler using local WAV samples
       this.drumSampler = new Tone.Sampler(
@@ -166,7 +174,7 @@ export class AudioEngine {
           A1: '/samples/clap.wav',
         },
         { attack: 0, release: 0.1, volume: -2 }
-      ).connect(eq);
+      );
 
       this.emit({ isReady: true });
     } catch (err) {
@@ -262,7 +270,12 @@ export class AudioEngine {
 
     // Dispose old instruments and channels
     for (const inst of this.instruments.values()) {
-      inst.output.disconnect();
+      if ('output' in inst && inst.output) {
+        try { inst.output.disconnect(); } catch { /* noop */ }
+      }
+      if ('dispose' in inst && typeof inst.dispose === 'function') {
+        try { inst.dispose(); } catch { /* noop */ }
+      }
     }
     this.instruments.clear();
     for (const gain of this.sidechainGains.values()) {
@@ -278,34 +291,57 @@ export class AudioEngine {
     const melodicTracks = project.tracks.filter((t) => !isDrumTrack(t.name));
     this.resetLoading(melodicTracks.length);
 
-    const compressor = this.effects[3];
+    const compressor = this.effects.find((e) => e instanceof Tone.Compressor) as Tone.Compressor;
 
     for (const track of project.tracks) {
       this.createTrackChannel(track);
     }
 
+    // Route drum sampler through each drum track channel
+    for (const track of project.tracks) {
+      if (isDrumTrack(track.name)) {
+        const channel = this.trackChannels.get(track.id);
+        if (channel) {
+          this.drumSampler?.connect(channel.gain);
+          channel.gain.connect(channel.panner);
+        }
+      }
+    }
+
     for (const track of melodicTracks) {
-      const instrumentName = instrumentForTrack(track.name, project.style);
-      const soundfont = new Soundfont(context, {
-        instrument: instrumentName,
-        kit: 'FluidR3_GM',
-        volume: 100,
-      });
-
-      await soundfont.load;
-
       const channel = this.trackChannels.get(track.id);
       const sidechainGain = new Tone.Gain(1).connect(compressor);
-      if (channel) {
-        (soundfont.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
-        channel.gain.connect(channel.panner);
-        channel.panner.connect(sidechainGain);
-      } else {
-        (soundfont.output as unknown as AudioNode).connect(sidechainGain as unknown as AudioNode);
-      }
       this.sidechainGains.set(track.id, sidechainGain);
 
-      this.instruments.set(track.id, soundfont);
+      const voiceType = voiceTypeForTrack(track.name);
+
+      if (voiceType === 'custom') {
+        const synth = createSynthForTrack(track.name, project.style);
+        synth.connect(channel?.gain ?? sidechainGain);
+        this.instruments.set(track.id, synth);
+      } else {
+        const instrumentName = instrumentForTrack(track.name);
+        const soundfont = new Soundfont(context, {
+          instrument: instrumentName,
+          kit: 'FluidR3_GM',
+          volume: 100,
+        });
+
+        await soundfont.load;
+
+        if (channel) {
+          (soundfont.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
+        } else {
+          (soundfont.output as unknown as AudioNode).connect(sidechainGain as unknown as AudioNode);
+        }
+        this.instruments.set(track.id, soundfont);
+      }
+
+      if (channel) {
+        channel.gain.connect(channel.panner);
+        channel.panner.connect(sidechainGain);
+      }
+
       this.markLoaded();
     }
 
@@ -330,11 +366,9 @@ export class AudioEngine {
         }))
       );
 
-      if (notes.length === 0) continue;
-
-      const channel = this.trackChannels.get(track.id);
-
       if (isDrumTrack(track.name)) {
+        if (notes.length === 0) continue;
+
         // Schedule kick separately for sidechain trigger
         const kickNotes = notes.filter((n) => n.note === 36);
         if (kickNotes.length > 0) {
@@ -356,25 +390,56 @@ export class AudioEngine {
         }, notes);
         part.start(0);
         this.parts.push(part);
-
-        if (channel) {
-          this.drumSampler?.connect(channel.panner);
-        }
       } else {
         const instrument = this.instruments.get(track.id);
         if (!instrument) continue;
 
         const part = new Tone.Part<ScheduledNote>((time, value) => {
-          instrument.start({
-            note: value.note,
-            time,
-            duration: value.duration,
-            velocity: Math.round(value.velocity * 127),
-          });
+          const vel = Math.max(0, Math.min(1, value.velocity));
+          if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
+            // Tone.js synths
+            instrument.triggerAttackRelease(value.note, value.duration, time, vel);
+          } else {
+            // smplr Soundfont
+            (instrument as Soundfont).start({
+              note: value.note,
+              time,
+              duration: value.duration,
+              velocity: Math.round(vel * 127),
+            });
+          }
         }, notes);
         part.start(0);
         this.parts.push(part);
       }
+    }
+
+    // Metronome
+    this.scheduleMetronome(project);
+  }
+
+  private scheduleMetronome(project: Project) {
+    this.metronomePart?.dispose();
+    this.metronomePart = undefined;
+    if (!this.metronomeEnabled || !this.metronome) return;
+
+    const secondsPerBeat = 60 / project.bpm;
+    const totalBeats = project.bars * 4;
+    const events: Array<{ time: number; accent: boolean }> = [];
+    for (let beat = 0; beat < totalBeats; beat++) {
+      events.push({ time: beat * secondsPerBeat, accent: beat % 4 === 0 });
+    }
+
+    this.metronomePart = new Tone.Part<{ time: number; accent: boolean }>((time, value) => {
+      this.metronome?.triggerAttackRelease(value.accent ? 'C2' : 'G1', '32n', time, value.accent ? 0.9 : 0.6);
+    }, events);
+    this.metronomePart.start(0);
+  }
+
+  setMetronome(enabled: boolean) {
+    this.metronomeEnabled = enabled;
+    if (this.project) {
+      this.scheduleMetronome(this.project);
     }
   }
 
@@ -406,8 +471,17 @@ export class AudioEngine {
 
   dispose() {
     this.disposeParts();
+    this.metronomePart?.dispose();
+    this.metronome?.dispose();
     this.effects.forEach((eff) => eff.dispose());
-    this.instruments.forEach((inst) => inst.output.disconnect());
+    this.instruments.forEach((inst) => {
+      if ('output' in inst && inst.output) {
+        try { inst.output.disconnect(); } catch { /* noop */ }
+      }
+      if ('dispose' in inst && typeof inst.dispose === 'function') {
+        try { inst.dispose(); } catch { /* noop */ }
+      }
+    });
     this.instruments.clear();
     this.sidechainGains.forEach((gain) => gain.dispose());
     this.sidechainGains.clear();
