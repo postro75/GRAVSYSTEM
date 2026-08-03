@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: gravsystem-api
+    runtime: docker
+    repo: https://github.com/postro75/GRAVSYSTEM
+    dockerfilePath: apps/api/Dockerfile
+    rootDir: apps/api
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gravsystem-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gravsystem-redis
+          property: connectionString
+      - key: GROK_API_KEY
+        sync: false
+      - key: KIMI_API_KEY
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: gravsystem-renders
+
+  - type: worker
+    name: gravsystem-worker
+    runtime: docker
+    repo: https://github.com/postro75/GRAVSYSTEM
+    dockerfilePath: apps/api/Dockerfile
+    rootDir: apps/api
+    dockerCommand: echo "Worker placeholder — replace with Celery when async jobs are added"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gravsystem-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gravsystem-redis
+          property: connectionString
+      - key: GROK_API_KEY
+        sync: false
+      - key: KIMI_API_KEY
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: gravsystem-renders
+
+databases:
+  - name: gravsystem-db
+    databaseName: gravsystem
+    user: gravsystem
+
+redis:
+  - name: gravsystem-redis
+    plan: standard

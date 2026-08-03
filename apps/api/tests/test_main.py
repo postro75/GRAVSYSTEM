@@ -80,3 +80,18 @@ def test_generate_jarre_style() -> None:
     assert data["config"]["bpm"] == 108
     tracks = data["project"]["tracks"]
     assert any("Arpeggio" in t["name"] for t in tracks)
+
+
+def test_export_midi() -> None:
+    response = client.post(
+        "/api/generate",
+        json={"description": "Dance track", "style": "dance", "bpm": 120, "bars": 8},
+    )
+    assert response.status_code == 200
+    project = response.json()["project"]
+
+    response = client.post("/api/export/midi", json=project)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/midi"
+    assert response.headers["content-disposition"].endswith('.mid"')
+    assert len(response.content) > 0

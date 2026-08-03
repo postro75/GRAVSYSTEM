@@ -1,7 +1,7 @@
 from typing import Any
 from datetime import datetime, timezone
 from uuid import uuid4
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import sys
 from pathlib import Path
@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent / "packages" / "core" / 
 from schemas import Project, GenerationRequest, Track, Region, MidiEvent
 from music_theory import build_config
 from pattern_generator import generate_midi_events, TICKS_PER_BEAT
+from midi_export import project_to_midi_bytes
 
 app = FastAPI(
     title="GRAVSYSTEM API",
@@ -79,6 +80,7 @@ def build_project_from_config(config: dict[str, Any]) -> Project:
         id=uuid4(),
         title=config["description"][:60] or "Generated Project",
         description=config["description"],
+        style=str(config["style"]),
         bpm=float(config["bpm"]),
         key=config["key"],
         scale=config["scale"],
@@ -136,6 +138,18 @@ def generate_project(request: GenerationRequest) -> dict[str, Any]:
         "project": project.model_dump(mode="json"),
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@app.post("/api/export/midi")
+def export_midi(project: Project) -> Response:
+    """Export a Project JSON to a downloadable .mid file."""
+    midi_bytes = project_to_midi_bytes(project)
+    filename = f"{project.title.replace(' ', '_')}.mid"
+    return Response(
+        content=midi_bytes,
+        media_type="audio/midi",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/")

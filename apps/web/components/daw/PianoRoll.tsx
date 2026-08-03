@@ -19,18 +19,69 @@ const MAX_PITCH = 96;
 export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollProps) {
   const [events, setEvents] = useState<MidiEvent[]>(region.midiEvents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [history, setHistory] = useState<MidiEvent[][]>([region.midiEvents]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   useEffect(() => {
     setEvents(region.midiEvents);
+    setHistory([region.midiEvents]);
+    setHistoryIndex(0);
   }, [region]);
 
-  const commit = useCallback(
+  const sendChange = useCallback(
     (next: MidiEvent[]) => {
       setEvents(next);
       onChange?.({ ...region, midiEvents: next });
     },
     [onChange, region]
   );
+
+  const pushHistory = useCallback(
+    (next: MidiEvent[]) => {
+      const trimmed = history.slice(0, historyIndex + 1);
+      const newHistory = [...trimmed, next];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      sendChange(next);
+    },
+    [history, historyIndex, sendChange]
+  );
+
+  const commit = useCallback(
+    (next: MidiEvent[]) => {
+      pushHistory(next);
+    },
+    [pushHistory]
+  );
+
+  const undo = useCallback(() => {
+    if (historyIndex <= 0) return;
+    const nextIndex = historyIndex - 1;
+    setHistoryIndex(nextIndex);
+    sendChange(history[nextIndex]);
+  }, [history, historyIndex, sendChange]);
+
+  const redo = useCallback(() => {
+    if (historyIndex >= history.length - 1) return;
+    const nextIndex = historyIndex + 1;
+    setHistoryIndex(nextIndex);
+    sendChange(history[nextIndex]);
+  }, [history, historyIndex, sendChange]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const snap = (value: number, step: number) => Math.round(value / step) * step;
 
@@ -149,6 +200,20 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={undo}
+              disabled={historyIndex <= 0}
+              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-apple-text hover:bg-white/10 disabled:opacity-40"
+            >
+              Undo
+            </button>
+            <button
+              onClick={redo}
+              disabled={historyIndex >= history.length - 1}
+              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-apple-text hover:bg-white/10 disabled:opacity-40"
+            >
+              Redo
+            </button>
+            <button
               onClick={extendDuration}
               className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-apple-text hover:bg-white/10 disabled:opacity-40"
               disabled={selectedId === null}
@@ -218,7 +283,7 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
         </div>
 
         <div className="border-t border-white/10 px-4 py-2 text-xs text-apple-muted">
-          Left click grid to add · Left click note to select · Drag to move · Right click to delete
+          Left click grid to add · Left click note to select · Drag to move · Right click to delete · Cmd/Ctrl+Z undo/redo
         </div>
       </div>
     </div>

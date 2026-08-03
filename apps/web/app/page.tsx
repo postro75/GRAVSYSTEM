@@ -9,8 +9,14 @@ import { PianoRoll } from '@/components/daw/PianoRoll';
 import { GenerationForm } from '@/components/GenerationForm';
 import { GenerationRequest } from '@/lib/types';
 import { Project, ProjectSchema, Region } from '@gravsystem/core';
-import { TonePlayer, TonePlayerState } from '@/lib/tone-engine';
-import { Loader2 } from 'lucide-react';
+import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
+import { Loader2, Download } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+function apiPath(path: string): string {
+  return `${API_URL}${path}`;
+}
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -24,18 +30,19 @@ export default function Home() {
   const [dawProject, setDawProject] = useState<Project | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [playerState, setPlayerState] = useState<TonePlayerState>({
+  const [playerState, setPlayerState] = useState<AudioEngineState>({
     isPlaying: false,
     isReady: false,
+    loading: false,
     error: null,
   });
   const [position, setPosition] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
 
-  const playerRef = useRef<TonePlayer | null>(null);
+  const playerRef = useRef<AudioEngine | null>(null);
 
   useEffect(() => {
-    const player = new TonePlayer(setPlayerState);
+    const player = new AudioEngine(setPlayerState);
     playerRef.current = player;
     player.init();
 
@@ -59,7 +66,7 @@ export default function Home() {
     setIsGenerating(true);
     setError(null);
     try {
-      const res = await fetch('/api/generate', {
+      const res = await fetch(apiPath('/api/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -78,7 +85,7 @@ export default function Home() {
       const project = ProjectSchema.parse(data.project);
       setProjects((prev) => [project, ...prev]);
       setDawProject(project);
-      playerRef.current?.loadProject(project);
+      await playerRef.current?.loadProject(project);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -101,7 +108,7 @@ export default function Home() {
   const handlePause = () => playerRef.current?.pause();
   const handleStop = () => playerRef.current?.stop();
 
-  const handleRegionChange = (updatedRegion: Region) => {
+  const handleRegionChange = async (updatedRegion: Region) => {
     if (!dawProject) return;
     const nextProject: Project = {
       ...dawProject,
@@ -114,7 +121,32 @@ export default function Home() {
       updatedAt: new Date().toISOString(),
     };
     setDawProject(nextProject);
-    playerRef.current?.loadProject(nextProject);
+    await playerRef.current?.loadProject(nextProject);
+  };
+
+  const handleExportMidi = async () => {
+    if (!dawProject) return;
+    try {
+      const res = await fetch(apiPath('/api/export/midi'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dawProject),
+      });
+      if (!res.ok) {
+        throw new Error('MIDI export failed');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dawProject.title.replace(/\s+/g, '_')}.mid`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    }
   };
 
   return (
@@ -131,6 +163,17 @@ export default function Home() {
           onPause={handlePause}
           onStop={handleStop}
         />
+
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={handleExportMidi}
+            disabled={!dawProject}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+          >
+            <Download size={14} />
+            Export MIDI
+          </button>
+        </div>
 
         <div className="min-h-0 flex-1">
           <Timeline

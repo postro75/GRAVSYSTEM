@@ -43,6 +43,13 @@
   - Zmiany w piano rollu aktualizują projekt i przeładowują audio.
   - `docs/Backend Consolidation Plan.md` — konsolidacja backendu na FastAPI + Render.
   - `docs/Phase 2 ROI Critique.md`
+- **Phase 3 — Professional sound + MIDI export ukończona:**
+  - Nowy silnik audio: SoundFont (smplr) + sample perkusji + efekty + sidechain.
+  - Endpoint `/api/export/midi` i przycisk "Export MIDI" w UI.
+  - Undo/redo w piano roll.
+  - Pliki deploymentowe: `apps/api/Dockerfile`, `apps/api/Procfile`, `render.yaml`.
+  - `docs/Phase 3 ROI Critique.md`.
+  - **Bloker:** FastAPI nie wdrożony na Render/AWS z powodu braku credentials.
 
 ## Wymagane zmienne środowiskowe
 

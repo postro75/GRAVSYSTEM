@@ -47,6 +47,7 @@ class Project(BaseModel):
     owner_id: Optional[str] = None
     title: str = "Untitled Project"
     description: str = ""
+    style: str = "dance"
     bpm: float = Field(default=120.0, gt=0)
     key: str = "C"
     scale: Literal["major", "minor"] = "minor"
