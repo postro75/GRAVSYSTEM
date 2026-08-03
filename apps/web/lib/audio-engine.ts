@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import { Soundfont, DrumMachine } from 'smplr';
-import { Project } from '@gravsystem/core';
+import { Project, Track } from '@gravsystem/core';
 
 export interface AudioEngineState {
   isPlaying: boolean;
@@ -101,6 +101,13 @@ function isDrumTrack(trackName: string): boolean {
   return name.includes('drum') || name.includes('kick') || name.includes('hat') || name.includes('clap');
 }
 
+interface TrackChannel {
+  gain: Tone.Gain;
+  panner: Tone.Panner;
+  mute: boolean;
+  solo: boolean;
+}
+
 export class AudioEngine {
   private project: Project | null = null;
   private onStateChange?: (state: AudioEngineState) => void;
@@ -111,6 +118,7 @@ export class AudioEngine {
   private drumSampler?: Tone.Sampler;
   private effects: Tone.ToneAudioNode[] = [];
   private sidechainGains: Map<string, Tone.Gain> = new Map();
+  private trackChannels: Map<string, TrackChannel> = new Map();
   private loadingCount = 0;
   private loadedCount = 0;
 
@@ -205,10 +213,54 @@ export class AudioEngine {
     }
   }
 
+  private createTrackChannel(track: Track): TrackChannel {
+    const channel: TrackChannel = {
+      gain: new Tone.Gain(track.volume ?? 1),
+      panner: new Tone.Panner(track.pan ?? 0),
+      mute: track.mute ?? false,
+      solo: track.solo ?? false,
+    };
+    channel.gain.connect(channel.panner);
+    this.trackChannels.set(track.id, channel);
+    return channel;
+  }
+
+  private getDestinationForDrums() {
+    return this.effects[3]; // EQ
+  }
+
+  private applySoloState() {
+    const anySolo = Array.from(this.trackChannels.values()).some((ch) => ch.solo);
+    for (const channel of this.trackChannels.values()) {
+      const targetMute = channel.mute || (anySolo && !channel.solo);
+      channel.gain.gain.setTargetAtTime(targetMute ? 0 : 1, Tone.now(), 0.02);
+    }
+  }
+
+  updateTrack(trackId: string, updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>) {
+    const channel = this.trackChannels.get(trackId);
+    if (!channel) return;
+
+    if (updates.volume !== undefined) {
+      channel.gain.gain.setTargetAtTime(Math.max(0, Math.min(2, updates.volume)), Tone.now(), 0.02);
+    }
+    if (updates.pan !== undefined) {
+      channel.panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, updates.pan)), Tone.now(), 0.02);
+    }
+    if (updates.mute !== undefined) {
+      channel.mute = updates.mute;
+      this.applySoloState();
+    }
+    if (updates.solo !== undefined) {
+      channel.solo = updates.solo;
+      this.applySoloState();
+    }
+  }
+
   private async loadInstruments(project: Project) {
     const context = Tone.context.rawContext as AudioContext;
 
-    // Dispose old instruments
+    // Dispose old instruments and channels
     for (const inst of this.instruments.values()) {
       inst.output.disconnect();
     }
@@ -217,11 +269,20 @@ export class AudioEngine {
       gain.dispose();
     }
     this.sidechainGains.clear();
+    for (const channel of this.trackChannels.values()) {
+      channel.gain.dispose();
+      channel.panner.dispose();
+    }
+    this.trackChannels.clear();
 
     const melodicTracks = project.tracks.filter((t) => !isDrumTrack(t.name));
     this.resetLoading(melodicTracks.length);
 
     const compressor = this.effects[3];
+
+    for (const track of project.tracks) {
+      this.createTrackChannel(track);
+    }
 
     for (const track of melodicTracks) {
       const instrumentName = instrumentForTrack(track.name, project.style);
@@ -233,14 +294,22 @@ export class AudioEngine {
 
       await soundfont.load;
 
-      // Sidechain gain per track (ducked by kick)
+      const channel = this.trackChannels.get(track.id);
       const sidechainGain = new Tone.Gain(1).connect(compressor);
-      (soundfont.output as unknown as AudioNode).connect(sidechainGain as unknown as AudioNode);
+      if (channel) {
+        (soundfont.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
+        channel.gain.connect(channel.panner);
+        channel.panner.connect(sidechainGain);
+      } else {
+        (soundfont.output as unknown as AudioNode).connect(sidechainGain as unknown as AudioNode);
+      }
       this.sidechainGains.set(track.id, sidechainGain);
 
       this.instruments.set(track.id, soundfont);
       this.markLoaded();
     }
+
+    this.applySoloState();
   }
 
   private scheduleProject(project: Project) {
@@ -262,6 +331,8 @@ export class AudioEngine {
       );
 
       if (notes.length === 0) continue;
+
+      const channel = this.trackChannels.get(track.id);
 
       if (isDrumTrack(track.name)) {
         // Schedule kick separately for sidechain trigger
@@ -285,6 +356,10 @@ export class AudioEngine {
         }, notes);
         part.start(0);
         this.parts.push(part);
+
+        if (channel) {
+          this.drumSampler?.connect(channel.panner);
+        }
       } else {
         const instrument = this.instruments.get(track.id);
         if (!instrument) continue;
@@ -336,6 +411,11 @@ export class AudioEngine {
     this.instruments.clear();
     this.sidechainGains.forEach((gain) => gain.dispose());
     this.sidechainGains.clear();
+    this.trackChannels.forEach((channel) => {
+      channel.gain.dispose();
+      channel.panner.dispose();
+    });
+    this.trackChannels.clear();
     this.drumSampler?.dispose();
     Tone.Transport.cancel(0);
   }

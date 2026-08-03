@@ -6,11 +6,13 @@ import { PromptBar } from '@/components/daw/PromptBar';
 import { Transport } from '@/components/daw/Transport';
 import { Timeline } from '@/components/daw/Timeline';
 import { PianoRoll } from '@/components/daw/PianoRoll';
+import { Mixer } from '@/components/daw/Mixer';
 import { GenerationForm } from '@/components/GenerationForm';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
-import { Project, ProjectSchema, Region } from '@gravsystem/core';
+import { Project, ProjectSchema, Region, Track } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
+import { downloadRpp } from '@/lib/rpp-export';
 import { generateProject } from '@/lib/generator';
 import {
   loadProjects,
@@ -152,10 +154,38 @@ export default function Home() {
     await playerRef.current?.loadProject(nextProject);
   };
 
+  const handleTrackChange = (
+    trackId: string,
+    updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>
+  ) => {
+    if (!dawProject) return;
+    playerRef.current?.updateTrack(trackId, updates);
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.id === trackId ? { ...track, ...updates } : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) =>
+      prev.map((p) => (p.id === nextProject.id ? nextProject : p))
+    );
+  };
+
   const handleExportMidi = () => {
     if (!dawProject) return;
     try {
       downloadMidi(dawProject);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
+  const handleExportRpp = () => {
+    if (!dawProject) return;
+    try {
+      downloadRpp(dawProject);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
     }
@@ -231,6 +261,14 @@ export default function Home() {
             />
           </label>
           <button
+            onClick={handleExportRpp}
+            disabled={!dawProject}
+            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
+          >
+            <Download size={14} />
+            Export REAPER
+          </button>
+          <button
             onClick={handleExportMidi}
             disabled={!dawProject}
             className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
@@ -247,8 +285,13 @@ export default function Home() {
             position={position}
             bpm={dawProject?.bpm ?? 120}
             onRegionClick={(_, region) => setSelectedRegion(region)}
+            onRegionChange={handleRegionChange}
           />
         </div>
+
+        {dawProject && dawProject.tracks.length > 0 && (
+          <Mixer tracks={dawProject.tracks} onChange={handleTrackChange} />
+        )}
 
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <h2 className="mb-3 text-sm font-semibold text-apple-text">Classic generator</h2>

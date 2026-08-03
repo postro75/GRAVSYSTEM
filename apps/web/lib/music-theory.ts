@@ -289,6 +289,13 @@ export function extractChords(description: string): string[] | undefined {
   return matches && matches.length >= 3 ? matches : undefined;
 }
 
+export type Section = 'intro' | 'build' | 'drop' | 'break' | 'outro';
+
+export interface ArrangementSection {
+  section: Section;
+  bars: number;
+}
+
 export interface GenerationConfig {
   bpm: number;
   bars: number;
@@ -299,6 +306,55 @@ export interface GenerationConfig {
   trackLayout: string[];
   patternTypes: Record<string, string>;
   description: string;
+  arrangement: ArrangementSection[];
+  humanize: boolean;
+}
+
+export function defaultArrangement(bars: number, style: string): ArrangementSection[] {
+  // Ambient/Jarre: longer intro/outro, no drop
+  if (style === 'ambient' || style === 'jarre') {
+    if (bars >= 32) {
+      return [
+        { section: 'intro', bars: 8 },
+        { section: 'build', bars: 8 },
+        { section: 'drop', bars: 8 },
+        { section: 'break', bars: 4 },
+        { section: 'outro', bars: bars - 28 },
+      ];
+    }
+    return [
+      { section: 'intro', bars: 4 },
+      { section: 'build', bars: 4 },
+      { section: 'drop', bars: Math.max(4, bars - 12) },
+      { section: 'outro', bars: 4 },
+    ];
+  }
+
+  // Dance/EDM: clear build/drop
+  if (bars >= 32) {
+    return [
+      { section: 'intro', bars: 8 },
+      { section: 'build', bars: 8 },
+      { section: 'drop', bars: 8 },
+      { section: 'break', bars: 4 },
+      { section: 'drop', bars: 4 },
+      { section: 'outro', bars: bars - 32 },
+    ];
+  }
+  if (bars >= 24) {
+    return [
+      { section: 'intro', bars: 4 },
+      { section: 'build', bars: 8 },
+      { section: 'drop', bars: 8 },
+      { section: 'outro', bars: 4 },
+    ];
+  }
+  return [
+    { section: 'intro', bars: 4 },
+    { section: 'build', bars: 4 },
+    { section: 'drop', bars: Math.max(4, bars - 12) },
+    { section: 'outro', bars: 4 },
+  ];
 }
 
 export function buildConfig(
@@ -320,6 +376,8 @@ export function buildConfig(
     : transposeProgression(defaultProgression(scale, style), key, scale);
   const layout = overrides.trackLayout ?? defaultTrackLayout(style);
   const patternTypes = overrides.patternTypes ?? defaultPatternTypes(layout, style);
+  const arrangement = overrides.arrangement ?? defaultArrangement(bars, style);
+  const humanize = overrides.humanize ?? true;
 
   return {
     bpm,
@@ -331,5 +389,7 @@ export function buildConfig(
     trackLayout: layout,
     patternTypes,
     description,
+    arrangement,
+    humanize,
   };
 }
