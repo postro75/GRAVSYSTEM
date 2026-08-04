@@ -120,45 +120,107 @@ function getNoteName(midiNote: number): string {
   return names[midiNote % 12];
 }
 
-const STYLE_PROGRESSIONS: Record<string, Record<string, string[]>> = {
+const STYLE_PROGRESSIONS: Record<string, Record<string, string[][]>> = {
   jarre: {
-    minor: ['Dm', 'C', 'Bb', 'A'],
-    major: ['C', 'G/B', 'Am', 'F'],
+    minor: [
+      ['Dm', 'C', 'Bb', 'A'],
+      ['Dm', 'Am', 'Gm', 'A'],
+      ['Dm', 'C', 'Gm', 'A'],
+    ],
+    major: [
+      ['C', 'G/B', 'Am', 'F'],
+      ['C', 'Am', 'F', 'G'],
+      ['F', 'C', 'G', 'Am'],
+    ],
   },
   ambient: {
-    minor: ['Am', 'G', 'F', 'G'],
-    major: ['C', 'G/B', 'Am', 'F'],
+    minor: [
+      ['Am', 'G', 'F', 'G'],
+      ['Am', 'F', 'C', 'G'],
+      ['Am', 'Em', 'F', 'C'],
+    ],
+    major: [
+      ['C', 'G/B', 'Am', 'F'],
+      ['F', 'C', 'G', 'Am'],
+      ['C', 'Em', 'F', 'G'],
+    ],
   },
   synthwave: {
-    minor: ['Am', 'F', 'Dm', 'G'],
-    major: ['F', 'G', 'Em', 'Am'],
+    minor: [
+      ['Am', 'F', 'Dm', 'G'],
+      ['Dm', 'Am', 'F', 'G'],
+      ['Am', 'G', 'F', 'Em'],
+    ],
+    major: [
+      ['F', 'G', 'Em', 'Am'],
+      ['C', 'G', 'Am', 'F'],
+      ['F', 'C', 'G', 'Am'],
+    ],
   },
   dance: {
-    minor: ['Dm', 'Bb', 'F', 'C'],
-    major: ['C', 'G', 'Am', 'F'],
+    minor: [
+      ['Dm', 'Bb', 'F', 'C'],
+      ['Dm', 'C', 'Bb', 'F'],
+      ['Dm', 'Am', 'Bb', 'F'],
+    ],
+    major: [
+      ['C', 'G', 'Am', 'F'],
+      ['C', 'Am', 'F', 'G'],
+      ['F', 'G', 'Am', 'C'],
+    ],
   },
   electro: {
-    minor: ['Dm', 'A', 'Gm', 'Bb'],
-    major: ['C', 'Am', 'F', 'G'],
+    minor: [
+      ['Dm', 'A', 'Gm', 'Bb'],
+      ['Dm', 'Gm', 'A', 'Dm'],
+      ['Dm', 'C', 'Gm', 'Bb'],
+    ],
+    major: [
+      ['C', 'Am', 'F', 'G'],
+      ['C', 'Gm', 'Bb', 'F'],
+      ['F', 'C', 'Dm', 'Bb'],
+    ],
   },
   house: {
-    minor: ['Am', 'F', 'C', 'G'],
-    major: ['C', 'G', 'Am', 'F'],
+    minor: [
+      ['Am', 'F', 'C', 'G'],
+      ['Am', 'G', 'F', 'G'],
+      ['Dm', 'Am', 'Bb', 'F'],
+    ],
+    major: [
+      ['C', 'G', 'Am', 'F'],
+      ['C', 'Am', 'F', 'G'],
+      ['F', 'G', 'Am', 'C'],
+    ],
   },
   techno: {
-    minor: ['Dm', 'Gm', 'A', 'Dm'],
-    major: ['Cm', 'Gm', 'Ab', 'Bb'],
+    minor: [
+      ['Dm', 'Gm', 'A', 'Dm'],
+      ['Dm', 'Am', 'Gm', 'A'],
+      ['Dm', 'Gm', 'Bb', 'A'],
+    ],
+    major: [
+      ['Cm', 'Gm', 'Ab', 'Bb'],
+      ['Cm', 'Bb', 'Ab', 'Gm'],
+      ['Cm', 'Gm', 'Bb', 'F'],
+    ],
   },
 };
 
 export function defaultProgression(scale: Scale, style: string, seed = Date.now()): string[] {
   const rng = mulberry32(seed + scale.length * 11 + style.length * 13);
   const styleMap = STYLE_PROGRESSIONS[style] ?? STYLE_PROGRESSIONS.dance;
-  const base = styleMap[scale] ?? styleMap.minor;
+  const variants = styleMap[scale] ?? styleMap.minor;
+  const base = variants[Math.floor(rng() * variants.length)];
 
   // Jarre/ambient: occasionally add a suspended or 7th variation for color
   if ((style === 'jarre' || style === 'ambient') && rng() > 0.6) {
-    return base.map((chord, i) => (i === 1 || i === 3 ? `${chord}sus4` : chord));
+    return base.map((chord, i) => {
+      if (i !== 1 && i !== 3) return chord;
+      // Turn "Am" into "Asus4", not "Amsus4".
+      const root = chord.match(CHORD_PATTERN)?.[1] ?? chord;
+      return `${root}sus4`;
+    });
   }
 
   // Dance/house: occasionally swap last chord for a dominant 7 to create tension
@@ -376,6 +438,17 @@ export function detectStyle(description: string): string {
   return 'dance';
 }
 
+export type Density = 'sparse' | 'medium' | 'dense';
+
+export function detectDensity(description: string): Density {
+  const lowered = description.toLowerCase();
+  const sparseKeywords = ['spokojny', 'spokojna', 'ambient', 'space', 'kosmos', 'minimal', 'slow', 'calm', 'relax'];
+  const denseKeywords = ['busy', 'dense', 'energetic', 'driving', 'hard', 'szybki', 'intensywny', 'intensywna', 'dynamic'];
+  if (sparseKeywords.some((k) => lowered.includes(k))) return 'sparse';
+  if (denseKeywords.some((k) => lowered.includes(k))) return 'dense';
+  return 'medium';
+}
+
 export function extractChords(description: string): string[] | undefined {
   const chordRe = '(?<![A-Za-z])[A-G][#b]?(?:m(?:in)?|maj7?|7|sus4|dim|aug)?(?![A-Za-z])';
   const clusterMatch = description.match(
@@ -411,6 +484,7 @@ export interface GenerationConfig {
   arrangement: ArrangementSection[];
   humanize: boolean;
   seed: number;
+  density: Density;
 }
 
 export function mulberry32(seed: number): () => number {
@@ -436,29 +510,23 @@ export function pickWeighted<T>(items: T[], weights: number[], rng: () => number
 export function defaultArrangement(bars: number, style: string, seed = Date.now()): ArrangementSection[] {
   const rng = mulberry32(seed + bars * 31 + style.length * 7);
 
-  // Ambient/Jarre: longer intro/outro, no drop
+  // Ambient/Jarre: longer intros/outros, no hard drop; use build/break for evolution.
   if (style === 'ambient' || style === 'jarre') {
     if (bars >= 32) {
       const variants: ArrangementSection[][] = [
         [
-          { section: 'intro', bars: 8 },
+          { section: 'intro', bars: 10 },
           { section: 'build', bars: 8 },
-          { section: 'drop', bars: 8 },
-          { section: 'break', bars: 4 },
-          { section: 'outro', bars: bars - 28 },
+          { section: 'break', bars: 8 },
+          { section: 'build', bars: 6 },
+          { section: 'outro', bars: bars - 32 },
         ],
         [
           { section: 'intro', bars: 12 },
           { section: 'build', bars: 8 },
-          { section: 'drop', bars: 8 },
-          { section: 'outro', bars: bars - 28 },
-        ],
-        [
-          { section: 'intro', bars: 8 },
-          { section: 'build', bars: 4 },
-          { section: 'drop', bars: 12 },
-          { section: 'break', bars: 4 },
-          { section: 'outro', bars: bars - 28 },
+          { section: 'break', bars: 6 },
+          { section: 'build', bars: 6 },
+          { section: 'outro', bars: bars - 32 },
         ],
       ];
       return variants[Math.floor(rng() * variants.length)];
@@ -466,7 +534,7 @@ export function defaultArrangement(bars: number, style: string, seed = Date.now(
     return [
       { section: 'intro', bars: 4 },
       { section: 'build', bars: 4 },
-      { section: 'drop', bars: Math.max(4, bars - 12) },
+      { section: 'break', bars: Math.max(4, bars - 12) },
       { section: 'outro', bars: 4 },
     ];
   }
@@ -548,6 +616,7 @@ export function buildConfig(
   const patternTypes = overrides.patternTypes ?? defaultPatternTypes(layout, style, seed);
   const arrangement = overrides.arrangement ?? defaultArrangement(bars, style, seed);
   const humanize = overrides.humanize ?? true;
+  const density = overrides.density ?? detectDensity(description);
 
   return {
     bpm,
@@ -562,5 +631,6 @@ export function buildConfig(
     arrangement,
     humanize,
     seed,
+    density,
   };
 }

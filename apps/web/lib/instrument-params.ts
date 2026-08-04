@@ -17,6 +17,84 @@ export function clampInstrumentParams(params: Partial<InstrumentParams>): Instru
   };
 }
 
+export const STYLE_INSTRUMENT_PARAMS: Record<string, Partial<InstrumentParams>> = {
+  jarre: {
+    attack: 0.08,
+    decay: 0.3,
+    sustain: 0.75,
+    release: 1.2,
+    cutoff: 6000,
+    resonance: 1.2,
+    reverb: 0.45,
+    delay: 0.35,
+  },
+  ambient: {
+    attack: 0.6,
+    decay: 0.4,
+    sustain: 0.9,
+    release: 2.0,
+    cutoff: 4000,
+    resonance: 0.8,
+    reverb: 0.6,
+    delay: 0.25,
+  },
+  synthwave: {
+    attack: 0.03,
+    decay: 0.25,
+    sustain: 0.8,
+    release: 0.7,
+    cutoff: 8000,
+    resonance: 1.5,
+    reverb: 0.35,
+    delay: 0.3,
+  },
+  dance: {
+    attack: 0.005,
+    decay: 0.15,
+    sustain: 0.85,
+    release: 0.35,
+    cutoff: 12000,
+    resonance: 2.0,
+    reverb: 0.2,
+    delay: 0.15,
+  },
+  electro: {
+    attack: 0.005,
+    decay: 0.12,
+    sustain: 0.8,
+    release: 0.3,
+    cutoff: 14000,
+    resonance: 2.5,
+    reverb: 0.15,
+    delay: 0.1,
+  },
+  house: {
+    attack: 0.005,
+    decay: 0.18,
+    sustain: 0.85,
+    release: 0.4,
+    cutoff: 11000,
+    resonance: 1.8,
+    reverb: 0.25,
+    delay: 0.2,
+  },
+  techno: {
+    attack: 0.002,
+    decay: 0.1,
+    sustain: 0.75,
+    release: 0.25,
+    cutoff: 20000,
+    resonance: 3.0,
+    reverb: 0.12,
+    delay: 0.08,
+  },
+};
+
+export function defaultParamsForStyle(style: string): InstrumentParams {
+  const styleDefaults = STYLE_INSTRUMENT_PARAMS[style.toLowerCase()] ?? {};
+  return clampInstrumentParams({ ...DEFAULT_INSTRUMENT_PARAMS, ...styleDefaults });
+}
+
 export type ToneSynth = Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth | Tone.AMSynth;
 
 export function applyInstrumentParams(synth: unknown, params: InstrumentParams): void {

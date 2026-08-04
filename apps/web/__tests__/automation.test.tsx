@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 import { createTrack, AutomationPoint } from '@gravsystem/core';
-import { interpolateValue } from '@/components/daw/AutomationEditor';
+import { interpolateValue, AutomationEditor } from '@/components/daw/AutomationEditor';
+import { render, screen } from '@testing-library/react';
 
 describe('automation', () => {
   it('creates a track with automation points', () => {
@@ -33,5 +34,16 @@ describe('automation', () => {
     ];
     expect(interpolateValue(points, 0)).toBe(0.5);
     expect(interpolateValue(points, 10)).toBe(1.2);
+  });
+
+  it('renders a playhead at the current position', () => {
+    const track = createTrack({ name: 'Bass' });
+    const { rerender } = render(<AutomationEditor track={track} bars={16} position={0} bpm={120} />);
+    const playhead = screen.getByTestId('automation-playhead');
+    expect(playhead.getAttribute('style')).toContain('left: 0px');
+
+    // 2 seconds at 120 BPM = 4 beats; BEAT_WIDTH = 60 => 240px
+    rerender(<AutomationEditor track={track} bars={16} position={2} bpm={120} />);
+    expect(playhead.getAttribute('style')).toContain('left: 240px');
   });
 });

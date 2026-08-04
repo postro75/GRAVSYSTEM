@@ -10,6 +10,7 @@ import {
   detectBars,
   detectKeyScale,
   detectStyle,
+  detectDensity,
   buildConfig,
 } from '@/lib/music-theory';
 
@@ -81,5 +82,18 @@ describe('music theory', () => {
     const techno = buildConfig('Techno club', {});
     expect(techno.bpm).toBe(styleBpm('techno'));
     expect(techno.style).toBe('techno');
+  });
+
+  it('detects density from description', () => {
+    expect(detectDensity('spokojny ambient space')).toBe('sparse');
+    expect(detectDensity('busy dense energetic track')).toBe('dense');
+    expect(detectDensity('dance track')).toBe('medium');
+  });
+
+  it('builds config with density', () => {
+    const sparse = buildConfig('spokojny ambient space', {});
+    expect(sparse.density).toBe('sparse');
+    const dense = buildConfig('busy dense dance', {});
+    expect(dense.density).toBe('dense');
   });
 });

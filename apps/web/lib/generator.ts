@@ -5,12 +5,12 @@ import {
   createTrack,
   createRegion,
   GenerationRequest,
-  DEFAULT_INSTRUMENT_PARAMS,
   DEFAULT_INSERT_EFFECTS,
 } from '@gravsystem/core';
 import { buildConfig } from './music-theory';
 import { generateMidiEvents, eventsToMidiEvents } from './pattern-generator';
 import { inferInstrumentForTrack, getInstrumentById } from './instruments';
+import { defaultParamsForStyle } from './instrument-params';
 
 export function generateProject(request: GenerationRequest): Project {
   const config = buildConfig(request.description, {
@@ -32,7 +32,7 @@ export function generateProject(request: GenerationRequest): Project {
       type: 'midi',
       instrument: instrumentId,
       instrumentType: instrumentDef?.type ?? 'custom',
-      instrumentParams: DEFAULT_INSTRUMENT_PARAMS,
+      instrumentParams: defaultParamsForStyle(config.style),
       insertEffects: DEFAULT_INSERT_EFFECTS,
       automation: [],
       channel: tracks.length + 1,

@@ -13,6 +13,8 @@ import { Activity, Trash2 } from 'lucide-react';
 export interface AutomationEditorProps {
   track?: Track | null;
   bars?: number;
+  position?: number; // seconds
+  bpm?: number;
   onChange?: (trackId: string, points: AutomationPoint[]) => void;
 }
 
@@ -74,9 +76,10 @@ function interpolateValue(points: AutomationPoint[], time: number): number | und
 
 export { interpolateValue };
 
-export function AutomationEditor({ track, bars = 16, onChange }: AutomationEditorProps) {
+export function AutomationEditor({ track, bars = 16, position = 0, bpm = 120, onChange }: AutomationEditorProps) {
   const [points, setPoints] = useState<AutomationPoint[]>(track?.automation ?? []);
   const [selectedParam, setSelectedParam] = useState<AutomationParam | 'all'>('all');
+  const scrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     id: string;
     param: AutomationParam;
@@ -89,6 +92,19 @@ export function AutomationEditor({ track, bars = 16, onChange }: AutomationEdito
   useEffect(() => {
     setPoints(track?.automation ?? []);
   }, [track]);
+
+  // Keep the playhead visible as playback advances.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const secondsPerBeat = 60 / bpm;
+    const positionBeats = position / secondsPerBeat;
+    const x = timeToX(positionBeats);
+    const rightEdge = container.scrollLeft + container.clientWidth;
+    if (x > rightEdge - 60) {
+      container.scrollLeft = x - 60;
+    }
+  }, [position, bpm]);
 
   const sendChange = useCallback(
     (next: AutomationPoint[]) => {
@@ -178,6 +194,9 @@ export function AutomationEditor({ track, bars = 16, onChange }: AutomationEdito
 
   const totalBeats = bars * 4;
   const visibleParams = selectedParam === 'all' ? AUTOMATION_PARAMS : [selectedParam];
+  const secondsPerBeat = 60 / bpm;
+  const positionBeats = position / secondsPerBeat;
+  const playheadX = timeToX(positionBeats);
 
   return (
     <div className="flex h-full flex-col bg-apple-bg">
@@ -210,8 +229,15 @@ export function AutomationEditor({ track, bars = 16, onChange }: AutomationEdito
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-auto">
-        <div style={{ width: totalBeats * BEAT_WIDTH }}>
+      <div ref={scrollRef} className="relative min-h-0 flex-1 overflow-auto">
+        <div className="relative" style={{ width: totalBeats * BEAT_WIDTH }}>
+          {/* Playhead */}
+          <div
+            data-testid="automation-playhead"
+            className="pointer-events-none absolute top-0 bottom-0 z-30 w-px bg-apple-accent"
+            style={{ left: playheadX }}
+          />
+
           {/* Beat grid header */}
           <div className="relative h-6 border-b border-apple-border bg-apple-surface-raised">
             {Array.from({ length: totalBeats + 1 }).map((_, i) => (

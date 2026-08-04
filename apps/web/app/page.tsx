@@ -530,6 +530,7 @@ export default function Home() {
             bpm={dawProject?.bpm ?? 120}
             keyRoot={dawProject?.key ?? 'C'}
             scale={dawProject?.scale ?? 'minor'}
+            position={position}
             activeTab={activeBottomTab}
             onActiveTabChange={setActiveBottomTab}
             onRegionChange={handleRegionChange}

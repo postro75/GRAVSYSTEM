@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { mulberry32 } from './music-theory';
 
 export type InstrumentType = 'custom' | 'soundfont' | 'drums';
 
@@ -75,10 +76,99 @@ export function getInstrumentsByCategory(category: InstrumentDefinition['categor
   return INSTRUMENTS.filter((inst) => inst.category === category);
 }
 
+function categoryFromTrackName(trackName: string): InstrumentDefinition['category'] {
+  const name = trackName.toLowerCase();
+  if (name.includes('drum') || name.includes('kick') || name.includes('hat') || name.includes('clap')) return 'drums';
+  if (name.includes('bass')) return 'bass';
+  if (name.includes('lead')) return 'lead';
+  if (name.includes('drone')) return 'pad';
+  if (name.includes('pad') || name.includes('string')) return 'pad';
+  if (name.includes('arpeggio')) return 'arp';
+  if (name.includes('chords')) return 'chords';
+  if (name.includes('stab')) return 'chords';
+  if (name.includes('fx')) return 'fx';
+  return 'pad';
+}
+
+export const STYLE_INSTRUMENT_PALETTE: Record<
+  string,
+  Partial<Record<InstrumentDefinition['category'], string[]>>
+> = {
+  jarre: {
+    bass: ['jarre-bass'],
+    lead: ['jarre-lead'],
+    pad: ['string-pad', 'choir-pad'],
+    arp: ['fm-arp'],
+    drums: ['sample-drums', 'synth-drums'],
+    fx: ['sci-fi-fx'],
+  },
+  ambient: {
+    bass: ['jarre-bass'],
+    lead: ['jarre-lead'],
+    pad: ['choir-pad', 'string-pad'],
+    arp: ['fm-arp'],
+    drums: ['sample-drums'],
+    fx: ['sci-fi-fx'],
+  },
+  synthwave: {
+    bass: ['synthwave-bass'],
+    lead: ['synthwave-lead'],
+    pad: ['warm-pad', 'string-pad'],
+    arp: ['pluck-arp', 'fm-arp'],
+    chords: ['square-chords'],
+    drums: ['synth-drums', 'sample-drums'],
+    fx: ['sci-fi-fx'],
+  },
+  dance: {
+    bass: ['dance-bass', 'acid-bass'],
+    lead: ['dance-lead', 'fm-lead'],
+    pad: ['warm-pad'],
+    arp: ['pluck-arp'],
+    chords: ['square-chords', 'brass-stab'],
+    drums: ['sample-drums', 'synth-drums'],
+    fx: ['sci-fi-fx'],
+  },
+  electro: {
+    bass: ['acid-bass', 'dance-bass'],
+    lead: ['fm-lead', 'dance-lead'],
+    pad: ['warm-pad'],
+    arp: ['pluck-arp', 'fm-arp'],
+    chords: ['brass-stab', 'square-chords'],
+    drums: ['sample-drums', 'synth-drums'],
+    fx: ['sci-fi-fx'],
+  },
+  house: {
+    bass: ['dance-bass'],
+    lead: ['dance-lead', 'fm-lead'],
+    pad: ['warm-pad', 'string-pad'],
+    arp: ['pluck-arp'],
+    chords: ['square-chords', 'brass-stab'],
+    drums: ['sample-drums', 'synth-drums'],
+    fx: ['sci-fi-fx'],
+  },
+  techno: {
+    bass: ['acid-bass', 'dance-bass'],
+    lead: ['fm-lead', 'dance-lead'],
+    pad: ['warm-pad'],
+    arp: ['pluck-arp', 'fm-arp'],
+    chords: ['brass-stab'],
+    drums: ['sample-drums', 'synth-drums'],
+    fx: ['sci-fi-fx'],
+  },
+};
+
 export function inferInstrumentForTrack(trackName: string, style = 'dance'): string {
   const name = trackName.toLowerCase();
   const s = style.toLowerCase();
+  const category = categoryFromTrackName(trackName);
+  const palette = STYLE_INSTRUMENT_PALETTE[s]?.[category];
 
+  if (palette && palette.length > 0) {
+    const rng = mulberry32(trackName.length * 31 + s.length * 17 + 42);
+    return palette[Math.floor(rng() * palette.length)];
+  }
+
+  // Fallback to the previous heuristic for unstyled categories.
   if (name.includes('drum') || name.includes('kick') || name.includes('hat') || name.includes('clap')) {
     return 'synth-drums';
   }

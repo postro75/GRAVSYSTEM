@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { INSTRUMENTS, inferInstrumentForTrack, createCustomSynth } from '@/lib/instruments';
+import { INSTRUMENTS, inferInstrumentForTrack, createCustomSynth, STYLE_INSTRUMENT_PALETTE } from '@/lib/instruments';
 
 describe('instruments', () => {
   it('has unique instrument ids', () => {
@@ -7,12 +7,12 @@ describe('instruments', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('infers instruments by track name and style', () => {
-    expect(inferInstrumentForTrack('Bass', 'jarre')).toBe('jarre-bass');
-    expect(inferInstrumentForTrack('Bass', 'dance')).toBe('dance-bass');
-    expect(inferInstrumentForTrack('Lead', 'synthwave')).toBe('synthwave-lead');
-    expect(inferInstrumentForTrack('Drums', 'dance')).toBe('synth-drums');
-    expect(inferInstrumentForTrack('Pad', 'ambient')).toBe('warm-pad');
+  it('infers style-aware instruments from the palette', () => {
+    expect(STYLE_INSTRUMENT_PALETTE.jarre.bass).toContain(inferInstrumentForTrack('Bass', 'jarre'));
+    expect(STYLE_INSTRUMENT_PALETTE.dance.bass).toContain(inferInstrumentForTrack('Bass', 'dance'));
+    expect(STYLE_INSTRUMENT_PALETTE.synthwave.lead).toContain(inferInstrumentForTrack('Lead', 'synthwave'));
+    expect(STYLE_INSTRUMENT_PALETTE.dance.drums).toContain(inferInstrumentForTrack('Drums', 'dance'));
+    expect(STYLE_INSTRUMENT_PALETTE.ambient.pad).toContain(inferInstrumentForTrack('Pad', 'ambient'));
   });
 
   it('creates a custom synth for every custom instrument id', () => {

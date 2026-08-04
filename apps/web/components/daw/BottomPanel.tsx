@@ -20,6 +20,7 @@ export interface BottomPanelProps {
   bpm?: number;
   keyRoot?: string;
   scale?: 'major' | 'minor';
+  position?: number; // seconds
   activeTab?: BottomTab;
   onActiveTabChange?: (tab: BottomTab) => void;
   onRegionChange?: (region: Region) => void;
@@ -48,6 +49,7 @@ export function BottomPanel({
   bpm = 120,
   keyRoot = 'C',
   scale = 'minor',
+  position = 0,
   activeTab: controlledTab,
   onActiveTabChange,
   onRegionChange,
@@ -128,6 +130,8 @@ export function BottomPanel({
           <AutomationEditor
             track={tracks.find((t) => t.id === selectedTrackId) ?? null}
             bars={bars}
+            position={position}
+            bpm={bpm}
             onChange={onAutomationChange}
           />
         )}

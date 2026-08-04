@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { generateProject } from '@/lib/generator';
-import { defaultArrangement } from '@/lib/music-theory';
+import { generateMidiEvents } from '@/lib/pattern-generator';
+import { buildConfig, defaultArrangement, Density } from '@/lib/music-theory';
+import { STYLE_INSTRUMENT_PALETTE } from '@/lib/instruments';
 
 describe('generateProject', () => {
   it('generates a dance project offline', () => {
@@ -79,6 +81,51 @@ describe('generateProject', () => {
       const unique = new Set(velocities);
       expect(unique.size).toBeGreaterThan(1);
     }
+  });
+
+  it('uses style-specific instruments and macro defaults', () => {
+    const jarre = generateProject({
+      description: 'Jarre ambient 108 BPM D minor 32 bars',
+      style: 'jarre',
+      bpm: 108,
+      bars: 32,
+      key: 'D',
+      scale: 'minor',
+    });
+
+    const bass = jarre.tracks.find((t) => t.name.toLowerCase().includes('bass'));
+    expect(bass).toBeDefined();
+    expect(STYLE_INSTRUMENT_PALETTE.jarre.bass).toContain(bass!.instrument);
+    expect(bass!.instrumentParams.release).toBeGreaterThan(0.5);
+
+    const ambientPad = jarre.tracks.find((t) => t.name.toLowerCase().includes('pad'));
+    if (ambientPad) {
+      expect(STYLE_INSTRUMENT_PALETTE.jarre.pad).toContain(ambientPad.instrument);
+      expect(ambientPad.instrumentParams.attack).toBeGreaterThan(0.05);
+    }
+  });
+
+  it('reflects density in generated note counts', () => {
+    const seed = 123456;
+    function countNotes(density: Density) {
+      const config = buildConfig('dance track', {
+        style: 'dance',
+        bpm: 128,
+        bars: 16,
+        key: 'D',
+        scale: 'minor',
+        density,
+        seed,
+      });
+      const events = generateMidiEvents(config);
+      return events['Drums']?.length ?? 0;
+    }
+
+    const sparse = countNotes('sparse');
+    const medium = countNotes('medium');
+    const dense = countNotes('dense');
+    expect(sparse).toBeLessThanOrEqual(medium);
+    expect(medium).toBeLessThanOrEqual(dense);
   });
 });
 
