@@ -10,7 +10,7 @@ import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
 import { getInstrumentById } from '@/lib/instruments';
-import { Project, ProjectSchema, Region, Track, InstrumentParams, AutomationPoint } from '@gravsystem/core';
+import { Project, ProjectSchema, Region, Track, InstrumentParams, AutomationPoint, InsertEffects } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
 import { downloadRpp } from '@/lib/rpp-export';
@@ -399,14 +399,29 @@ export default function Home() {
     });
   };
 
-  const handleRecordNote = (note: { pitch: number; velocity: number; start: number; duration: number }) => {
+  const handleRecordNote = (note: { pitch: number; velocity: number; start: number; duration: number; replace?: boolean }) => {
     if (!selectedRegion) return;
+    const baseEvents = note.replace ? [] : selectedRegion.midiEvents;
     const updatedRegion: Region = {
       ...selectedRegion,
-      midiEvents: [...selectedRegion.midiEvents, note],
+      midiEvents: [...baseEvents, note],
       duration: Math.max(selectedRegion.duration, note.start + note.duration),
     };
     handleRegionChange(updatedRegion);
+  };
+
+  const handleInsertEffectsChange = (trackId: string, effects: InsertEffects) => {
+    if (!dawProject) return;
+    playerRef.current?.updateInsertEffects(trackId, effects);
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.id === trackId ? { ...track, insertEffects: effects } : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
   };
 
   const selectedTrack = dawProject?.tracks.find((t) => t.id === selectedTrackId) ?? null;
@@ -547,6 +562,7 @@ export default function Home() {
           onInstrumentSelect={handleInstrumentSelect}
           onInstrumentPreview={handleInstrumentPreview}
           onInstrumentParamsChange={handleInstrumentParamsChange}
+          onInsertEffectsChange={handleInsertEffectsChange}
         />
       </main>
 

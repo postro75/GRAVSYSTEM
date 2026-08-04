@@ -27,6 +27,10 @@ const PARAM_LABELS: Record<AutomationParam, string> = {
   resonance: 'Resonance',
   reverb: 'Reverb Send',
   delay: 'Delay Send',
+  attack: 'Env Attack',
+  decay: 'Env Decay',
+  sustain: 'Env Sustain',
+  release: 'Env Release',
 };
 
 function snap(value: number, step: number) {

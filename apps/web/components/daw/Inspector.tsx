@@ -6,6 +6,7 @@ import { getInstrumentById } from '@/lib/instruments';
 import { Hash, Clock, Music, Activity, Type, Guitar } from 'lucide-react';
 import { InstrumentPicker } from './InstrumentPicker';
 import { InstrumentMacroEditor } from './InstrumentMacroEditor';
+import { InsertEffectsRack } from './InsertEffectsRack';
 
 export interface InspectorProps {
   project?: {
@@ -21,6 +22,7 @@ export interface InspectorProps {
   onInstrumentSelect?: (trackId: string, instrumentId: string) => void;
   onInstrumentPreview?: (trackId: string, instrumentId: string) => void;
   onInstrumentParamsChange?: (trackId: string, params: import('@gravsystem/core').InstrumentParams) => void;
+  onInsertEffectsChange?: (trackId: string, effects: import('@gravsystem/core').InsertEffects) => void;
 }
 
 function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
@@ -42,6 +44,7 @@ export function Inspector({
   onInstrumentSelect,
   onInstrumentPreview,
   onInstrumentParamsChange,
+  onInsertEffectsChange,
 }: InspectorProps) {
   const style = selectedTrack ? trackStyle(selectedTrack.name) : null;
   const Icon = style?.icon;
@@ -112,6 +115,15 @@ export function Inspector({
               params={selectedTrack.instrumentParams}
               category={category}
               onChange={(params) => onInstrumentParamsChange(selectedTrack.id, params)}
+            />
+          </div>
+        )}
+
+        {selectedTrack && onInsertEffectsChange && (
+          <div className="mb-4">
+            <InsertEffectsRack
+              effects={selectedTrack.insertEffects}
+              onChange={(effects) => onInsertEffectsChange(selectedTrack.id, effects)}
             />
           </div>
         )}

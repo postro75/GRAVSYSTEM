@@ -6,6 +6,7 @@ import {
   createRegion,
   GenerationRequest,
   DEFAULT_INSTRUMENT_PARAMS,
+  DEFAULT_INSERT_EFFECTS,
 } from '@gravsystem/core';
 import { buildConfig } from './music-theory';
 import { generateMidiEvents, eventsToMidiEvents } from './pattern-generator';
@@ -32,6 +33,7 @@ export function generateProject(request: GenerationRequest): Project {
       instrument: instrumentId,
       instrumentType: instrumentDef?.type ?? 'custom',
       instrumentParams: DEFAULT_INSTRUMENT_PARAMS,
+      insertEffects: DEFAULT_INSERT_EFFECTS,
       automation: [],
       channel: tracks.length + 1,
     });

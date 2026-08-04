@@ -7,6 +7,8 @@ import {
   AutomationParam,
   AutomationPoint,
   AUTOMATION_RANGES,
+  InsertEffects,
+  DEFAULT_INSERT_EFFECTS,
 } from '@gravsystem/core';
 import { SynthDrumKit, SampleDrumKit } from './drum-kit';
 import {
@@ -57,12 +59,28 @@ interface TrackChannel {
   gain: Tone.Gain;
   panner: Tone.Panner;
   filter: Tone.Filter;
+  distortion: Tone.Distortion;
+  chorus: Tone.Chorus;
+  eq: Tone.EQ3;
+  compressor: Tone.Compressor;
   sendReverb: Tone.Gain;
   sendDelay: Tone.Gain;
   meter: Tone.Meter;
   sidechain: Tone.Gain;
   mute: boolean;
   solo: boolean;
+}
+
+export function mapInsertEffects(effects: InsertEffects) {
+  return {
+    distortion: effects.distortion * 0.8,
+    chorusWet: effects.chorus * 0.6,
+    eqLow: (effects.eq - 0.5) * 12, // -6 dB .. +6 dB
+    eqMid: (effects.eq - 0.5) * 12,
+    eqHigh: (effects.eq - 0.5) * 12,
+    compressorThreshold: effects.compressor * 30 - 30, // -30 dB .. 0 dB
+    compressorRatio: 1 + effects.compressor * 11, // 1:1 .. 12:1
+  };
 }
 
 export class AudioEngine {
@@ -189,6 +207,10 @@ export class AudioEngine {
       gain: new Tone.Gain(track.volume ?? 1),
       panner: new Tone.Panner(track.pan ?? 0),
       filter: createTrackFilter(track.instrumentParams),
+      distortion: new Tone.Distortion(0),
+      chorus: new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0 }),
+      eq: new Tone.EQ3({ low: 0, mid: 0, high: 0, lowFrequency: 250, highFrequency: 4000 }),
+      compressor: new Tone.Compressor({ threshold: 0, ratio: 1, attack: 0.003, release: 0.1 }),
       sendReverb: createSendGain(),
       sendDelay: createSendGain(),
       meter: new Tone.Meter({ smoothing: 0.1, normalRange: true }),
@@ -201,11 +223,15 @@ export class AudioEngine {
     channel.sendReverb.gain.value = track.instrumentParams.reverb;
     channel.sendDelay.gain.value = track.instrumentParams.delay;
 
-    // Main chain: gain -> panner -> meter -> filter -> sidechain -> compressor
+    // Main chain: gain -> panner -> meter -> filter -> distortion -> chorus -> eq -> compressor -> sidechain -> master
     channel.gain.connect(channel.panner);
     channel.panner.connect(channel.meter);
     channel.meter.connect(channel.filter);
-    channel.filter.connect(channel.sidechain);
+    channel.filter.connect(channel.distortion);
+    channel.distortion.connect(channel.chorus);
+    channel.chorus.connect(channel.eq);
+    channel.eq.connect(channel.compressor);
+    channel.compressor.connect(channel.sidechain);
     if (this.masterCompressor) channel.sidechain.connect(this.masterCompressor);
 
     // FX sends tap post-panner
@@ -214,9 +240,32 @@ export class AudioEngine {
     if (this.masterReverb) channel.sendReverb.connect(this.masterReverb);
     if (this.masterDelay) channel.sendDelay.connect(this.masterDelay);
 
+    this.applyInsertEffects(channel, track.insertEffects ?? DEFAULT_INSERT_EFFECTS);
+
     this.trackChannels.set(track.id, channel);
     this.sidechainGains.set(track.id, channel.sidechain);
     return channel;
+  }
+
+  /** Map normalized insert-effect amounts (0–1) to concrete processor parameters. */
+  private applyInsertEffects(channel: TrackChannel, effects: InsertEffects) {
+    const targets = mapInsertEffects(effects);
+    channel.distortion.distortion = targets.distortion;
+    channel.chorus.wet.value = targets.chorusWet;
+    channel.eq.low.value = targets.eqLow;
+    channel.eq.mid.value = targets.eqMid;
+    channel.eq.high.value = targets.eqHigh;
+    channel.compressor.threshold.value = targets.compressorThreshold;
+    channel.compressor.ratio.value = targets.compressorRatio;
+  }
+
+  /** Swap insert-effect values for a track live. */
+  updateInsertEffects(trackId: string, effects: InsertEffects) {
+    const track = this.project?.tracks.find((t) => t.id === trackId);
+    const channel = this.trackChannels.get(trackId);
+    if (!track || !channel) return;
+    track.insertEffects = effects;
+    this.applyInsertEffects(channel, effects);
   }
 
   private applySoloState() {
@@ -299,6 +348,10 @@ export class AudioEngine {
       channel.gain.dispose();
       channel.panner.dispose();
       channel.filter.dispose();
+      channel.distortion.dispose();
+      channel.chorus.dispose();
+      channel.eq.dispose();
+      channel.compressor.dispose();
       channel.sendReverb.dispose();
       channel.sendDelay.dispose();
       channel.meter.dispose();
@@ -503,6 +556,7 @@ export class AudioEngine {
     this.automationEventIds = [];
 
     const secondsPerBeat = 60 / project.bpm;
+    const macroParams: Set<AutomationParam> = new Set(['attack', 'decay', 'sustain', 'release']);
 
     for (const track of project.tracks) {
       if (track.automation.length === 0) continue;
@@ -516,6 +570,26 @@ export class AudioEngine {
 
       for (const [param, points] of byParam) {
         const sorted = points.sort((a, b) => a.time - b.time);
+
+        if (macroParams.has(param)) {
+          // Macro targets (ADSR) are not audio params; update the instrument live.
+          if (sorted[0].time > 0) {
+            const id = Tone.Transport.schedule(() => {
+              this.updateInstrumentParams(track.id, { [param]: AUTOMATION_RANGES[param].default } as Partial<InstrumentParams>);
+            }, 0);
+            this.automationEventIds.push(id);
+          }
+
+          for (const point of sorted) {
+            const startTime = point.time * secondsPerBeat;
+            const id = Tone.Transport.schedule(() => {
+              this.updateInstrumentParams(track.id, { [param]: point.value } as Partial<InstrumentParams>);
+            }, startTime);
+            this.automationEventIds.push(id);
+          }
+          continue;
+        }
+
         const audioParam = this.getAutomationAudioParam(track.id, param);
         if (!audioParam) continue;
 
@@ -662,6 +736,15 @@ export class AudioEngine {
     this.trackChannels.forEach((channel) => {
       channel.gain.dispose();
       channel.panner.dispose();
+      channel.filter.dispose();
+      channel.distortion.dispose();
+      channel.chorus.dispose();
+      channel.eq.dispose();
+      channel.compressor.dispose();
+      channel.sendReverb.dispose();
+      channel.sendDelay.dispose();
+      channel.meter.dispose();
+      channel.sidechain.dispose();
     });
     this.trackChannels.clear();
     this.drumKit?.dispose();

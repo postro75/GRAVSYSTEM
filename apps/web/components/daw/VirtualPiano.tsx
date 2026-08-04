@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, Square, Circle, Usb } from 'lucide-react';
+import { Mic, Square, Circle, Usb, Grid3X3, Layers } from 'lucide-react';
 import { Region } from '@gravsystem/core';
+import { QuantizeGrid, QUANTIZE_OPTIONS, quantizeValue } from '@/lib/midi-utils';
 
 export interface VirtualPianoProps {
   selectedRegion?: Region | null;
   getRecordPosition?: () => number;
   onPreview?: (pitch: number, velocity: number) => void;
-  onRecordNote?: (note: { pitch: number; velocity: number; start: number; duration: number }) => void;
+  onRecordNote?: (note: { pitch: number; velocity: number; start: number; duration: number; replace?: boolean }) => void;
 }
 
 const START_OCTAVE = 3;
@@ -28,18 +29,21 @@ function noteName(note: number): string {
 export function VirtualPiano({ selectedRegion, getRecordPosition, onPreview, onRecordNote }: VirtualPianoProps) {
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
+  const [overdub, setOverdub] = useState(false);
+  const [quantize, setQuantize] = useState<QuantizeGrid>('off');
   const [midiDevices, setMidiDevices] = useState(0);
   const heldRef = useRef<Set<number>>(new Set());
   const recordingNotesRef = useRef<Map<number, { start: number; velocity: number }>>(new Map());
+  const replaceRef = useRef(false);
   const midiAccessRef = useRef<MIDIAccess | null>(null);
 
   const recordNoteOn = useCallback(
     (pitch: number, velocity: number) => {
       if (!selectedRegion || !isRecording) return;
       const start = getRecordPosition ? getRecordPosition() : 0;
-      recordingNotesRef.current.set(pitch, { start: Math.max(0, start), velocity });
+      recordingNotesRef.current.set(pitch, { start: Math.max(0, quantizeValue(start, quantize, 0)), velocity });
     },
-    [selectedRegion, isRecording, getRecordPosition]
+    [selectedRegion, isRecording, getRecordPosition, quantize]
   );
 
   const recordNoteOff = useCallback(
@@ -48,16 +52,19 @@ export function VirtualPiano({ selectedRegion, getRecordPosition, onPreview, onR
       const note = recordingNotesRef.current.get(pitch);
       if (!note) return;
       const end = getRecordPosition ? getRecordPosition() : note.start + 0.5;
-      const duration = Math.max(0.05, end - note.start);
+      const duration = quantizeValue(Math.max(0.05, end - note.start), quantize, 0.05);
+      const shouldReplace = !overdub && !replaceRef.current;
+      if (shouldReplace) replaceRef.current = true;
       onRecordNote?.({
         pitch,
         velocity: note.velocity,
         start: note.start,
         duration,
+        replace: shouldReplace,
       });
       recordingNotesRef.current.delete(pitch);
     },
-    [selectedRegion, isRecording, getRecordPosition, onRecordNote]
+    [selectedRegion, isRecording, getRecordPosition, onRecordNote, quantize, overdub]
   );
 
   const startNote = useCallback(
@@ -179,7 +186,13 @@ export function VirtualPiano({ selectedRegion, getRecordPosition, onPreview, onR
             </div>
           )}
           <button
-            onClick={() => setIsRecording((v) => !v)}
+            onClick={() => {
+              setIsRecording((v) => {
+                const next = !v;
+                if (next) replaceRef.current = false;
+                return next;
+              });
+            }}
             disabled={!selectedRegion}
             className={`flex items-center gap-1.5 rounded-apple-sm px-3 py-1.5 text-xs font-medium transition ${
               isRecording
@@ -190,6 +203,36 @@ export function VirtualPiano({ selectedRegion, getRecordPosition, onPreview, onR
             {isRecording ? <Square size={12} /> : <Circle size={12} className="fill-current" />}
             {isRecording ? 'Stop' : 'Record'}
           </button>
+
+          <button
+            onClick={() => setOverdub((v) => !v)}
+            disabled={!selectedRegion}
+            title="Overdub keeps existing notes"
+            className={`flex items-center gap-1 rounded-apple-sm border px-2 py-1 text-[10px] transition disabled:opacity-40 ${
+              overdub
+                ? 'border-apple-accent/50 bg-apple-accent/10 text-apple-accent'
+                : 'border-apple-border bg-apple-surface text-apple-muted hover:bg-apple-surface-raised'
+            }`}
+          >
+            <Layers size={10} />
+            {overdub ? 'Overdub' : 'Replace'}
+          </button>
+
+          <div className="flex items-center gap-1 rounded-apple-sm border border-apple-border bg-apple-surface px-2 py-1 text-[10px] text-apple-muted">
+            <Grid3X3 size={10} />
+            <select
+              value={quantize}
+              onChange={(e) => setQuantize(e.target.value as QuantizeGrid)}
+              className="bg-transparent text-[10px] text-apple-text focus:outline-none"
+            >
+              {QUANTIZE_OPTIONS.map((q) => (
+                <option key={q} value={q}>
+                  Q {q}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="text-[10px] text-apple-muted">
             {selectedRegion ? selectedRegion.name : 'Select a region'}
           </div>
@@ -247,7 +290,7 @@ export function VirtualPiano({ selectedRegion, getRecordPosition, onPreview, onR
       <div className="mt-2 flex items-center gap-2 text-[10px] text-apple-muted">
         <Mic size={12} />
         <span>
-          Use keyboard keys A–L or a MIDI controller. Recording writes notes at the current playhead.
+          Use keyboard keys A–L or a MIDI controller. Choose quantize grid; Replace clears existing notes on first input, Overdub keeps them.
         </span>
       </div>
     </div>

@@ -41,6 +41,10 @@ export const AUTOMATION_PARAMS = [
   'resonance',
   'reverb',
   'delay',
+  'attack',
+  'decay',
+  'sustain',
+  'release',
 ] as const;
 
 export const AutomationParamSchema = z.enum(AUTOMATION_PARAMS);
@@ -55,6 +59,10 @@ export const AUTOMATION_RANGES: Record<
   resonance: { min: 0, max: 20, default: 1 },
   reverb: { min: 0, max: 1, default: 0.25 },
   delay: { min: 0, max: 1, default: 0.2 },
+  attack: { min: 0, max: 5, default: 0.02 },
+  decay: { min: 0, max: 5, default: 0.2 },
+  sustain: { min: 0, max: 1, default: 0.7 },
+  release: { min: 0, max: 10, default: 0.5 },
 };
 
 export const AutomationPointSchema = z.object({
@@ -62,6 +70,20 @@ export const AutomationPointSchema = z.object({
   param: AutomationParamSchema,
   time: z.number().nonnegative(), // beats
   value: z.number(), // actual parameter value
+});
+
+export const DEFAULT_INSERT_EFFECTS = {
+  distortion: 0,
+  chorus: 0,
+  eq: 0,
+  compressor: 0,
+};
+
+export const InsertEffectsSchema = z.object({
+  distortion: z.number().min(0).max(1).default(0),
+  chorus: z.number().min(0).max(1).default(0),
+  eq: z.number().min(0).max(1).default(0),
+  compressor: z.number().min(0).max(1).default(0),
 });
 
 export const RegionSchema = z.object({
@@ -92,6 +114,7 @@ export const TrackSchema = z.object({
   solo: z.boolean().default(false),
   effects: z.array(EffectSchema).default([]),
   automation: z.array(AutomationPointSchema).default([]),
+  insertEffects: InsertEffectsSchema.default(() => DEFAULT_INSERT_EFFECTS),
 });
 
 export const ProjectSchema = z.object({
@@ -125,6 +148,7 @@ export type Effect = z.infer<typeof EffectSchema>;
 export type InstrumentParams = z.infer<typeof InstrumentParamsSchema>;
 export type AutomationParam = z.infer<typeof AutomationParamSchema>;
 export type AutomationPoint = z.infer<typeof AutomationPointSchema>;
+export type InsertEffects = z.infer<typeof InsertEffectsSchema>;
 export type Region = z.infer<typeof RegionSchema>;
 export type Track = z.infer<typeof TrackSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
@@ -162,6 +186,7 @@ export function createTrack(input: Partial<Track> & { name: string }): Track {
     solo: input.solo ?? false,
     effects: input.effects ?? [],
     automation: input.automation ?? [],
+    insertEffects: input.insertEffects ?? DEFAULT_INSERT_EFFECTS,
   });
 }
 
