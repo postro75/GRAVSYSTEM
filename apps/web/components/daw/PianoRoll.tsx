@@ -8,16 +8,15 @@ export interface PianoRollProps {
   region: Region;
   bpm?: number;
   onChange?: (region: Region) => void;
-  onClose?: () => void;
 }
 
 const BEAT_WIDTH = 60;
-const NOTE_HEIGHT = 16;
+const NOTE_HEIGHT = 14;
 const TOTAL_BEATS = 16;
 const MIN_PITCH = 36;
 const MAX_PITCH = 96;
 
-export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollProps) {
+export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
   const [events, setEvents] = useState<MidiEvent[]>(region.midiEvents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<MidiEvent[][]>([region.midiEvents]);
@@ -235,116 +234,109 @@ export function PianoRoll({ region, bpm = 120, onChange, onClose }: PianoRollPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-8 backdrop-blur-sm">
-      <div className="flex h-full max-h-[80vh] w-full max-w-5xl flex-col rounded-2xl border border-white/10 bg-apple-bg shadow-apple">
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-          <div>
-            <h3 className="text-base font-semibold text-apple-text">Piano Roll</h3>
-            <p className="text-xs text-apple-muted">
-              {region.name} · {bpm} BPM · click grid to add, drag notes to move
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={undo}
-              disabled={historyIndex <= 0}
-              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-apple-text hover:bg-white/10 disabled:opacity-40"
-            >
-              Undo
-            </button>
-            <button
-              onClick={redo}
-              disabled={historyIndex >= history.length - 1}
-              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-apple-text hover:bg-white/10 disabled:opacity-40"
-            >
-              Redo
-            </button>
-            <button
-              onClick={extendDuration}
-              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-apple-text hover:bg-white/10 disabled:opacity-40"
-              disabled={selectedId === null}
-            >
-              Extend note
-            </button>
-            {selectedEvent && (
-              <div className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
-                <span className="text-xs text-apple-muted">Vel</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={127}
-                  value={selectedEvent.velocity}
-                  onChange={(e) => setVelocity(Number(e.target.value))}
-                  className="h-1 w-24 cursor-pointer appearance-none rounded bg-white/10 accent-apple-accent"
-                />
-                <span className="w-8 text-right text-xs text-apple-text">{selectedEvent.velocity}</span>
-              </div>
-            )}
-            <button
-              onClick={onClose}
-              className="rounded-lg bg-apple-accent px-4 py-1.5 text-xs font-medium text-white hover:bg-apple-accent/90"
-            >
-              Close
-            </button>
-          </div>
+    <div className="flex h-full flex-col bg-apple-bg">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-apple-border px-3">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-apple-text">{region.name}</span>
+          <span className="text-[10px] text-apple-muted">
+            {bpm} BPM · click grid to add, drag notes to move
+          </span>
         </div>
-
-        <div className="relative flex-1 overflow-auto">
-          <div
-            className="relative cursor-crosshair"
-            style={{
-              width: TOTAL_BEATS * BEAT_WIDTH,
-              height: (MAX_PITCH - MIN_PITCH + 1) * NOTE_HEIGHT,
-            }}
-            onClick={handleAdd}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={undo}
+            disabled={historyIndex <= 0}
+            className="rounded-md bg-apple-surface-raised px-2 py-1 text-[10px] text-apple-text transition hover:bg-apple-surface disabled:opacity-40"
           >
-            {/* Grid */}
-            {Array.from({ length: TOTAL_BEATS * 4 }).map((_, i) => (
-              <div
-                key={`v-${i}`}
-                className="absolute top-0 bottom-0 border-l border-white/5"
-                style={{ left: i * (BEAT_WIDTH / 4) }}
+            Undo
+          </button>
+          <button
+            onClick={redo}
+            disabled={historyIndex >= history.length - 1}
+            className="rounded-md bg-apple-surface-raised px-2 py-1 text-[10px] text-apple-text transition hover:bg-apple-surface disabled:opacity-40"
+          >
+            Redo
+          </button>
+          <button
+            onClick={extendDuration}
+            disabled={selectedId === null}
+            className="rounded-md bg-apple-surface-raised px-2 py-1 text-[10px] text-apple-text transition hover:bg-apple-surface disabled:opacity-40"
+          >
+            Extend
+          </button>
+          {selectedEvent && (
+            <div className="flex items-center gap-2 rounded-md bg-apple-surface-raised px-2 py-1">
+              <span className="text-[10px] text-apple-muted">Vel</span>
+              <input
+                type="range"
+                min={1}
+                max={127}
+                value={selectedEvent.velocity}
+                onChange={(e) => setVelocity(Number(e.target.value))}
+                className="h-1 w-20 cursor-pointer appearance-none rounded bg-apple-border accent-apple-accent"
               />
-            ))}
-            {Array.from({ length: MAX_PITCH - MIN_PITCH + 1 }).map((_, i) => (
-              <div
-                key={`h-${i}`}
-                className="absolute left-0 right-0 border-t border-white/5"
-                style={{ bottom: i * NOTE_HEIGHT }}
+              <span className="w-6 text-right text-[10px] text-apple-text">{selectedEvent.velocity}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="relative min-h-0 flex-1 overflow-auto">
+        <div
+          className="relative cursor-crosshair"
+          style={{
+            width: TOTAL_BEATS * BEAT_WIDTH,
+            height: (MAX_PITCH - MIN_PITCH + 1) * NOTE_HEIGHT,
+          }}
+          onClick={handleAdd}
+        >
+          {/* Grid */}
+          {Array.from({ length: TOTAL_BEATS * 4 }).map((_, i) => (
+            <div
+              key={`v-${i}`}
+              className="absolute top-0 bottom-0 border-l border-white/5"
+              style={{ left: i * (BEAT_WIDTH / 4) }}
+            />
+          ))}
+          {Array.from({ length: MAX_PITCH - MIN_PITCH + 1 }).map((_, i) => (
+            <div
+              key={`h-${i}`}
+              className="absolute left-0 right-0 border-t border-white/5"
+              style={{ bottom: i * NOTE_HEIGHT }}
+            />
+          ))}
+
+          {/* Notes */}
+          {events.map((evt, index) => {
+            const isSelected = selectedId === String(index);
+            return (
+              <button
+                key={`${evt.pitch}-${evt.start}-${index}`}
+                type="button"
+                onClick={(e) => handleSelect(e, index)}
+                onContextMenu={(e) => handleDelete(e, index)}
+                onPointerDown={(e) => handleNotePointerDown(e, index)}
+                className={`absolute rounded-sm ring-1 transition ${
+                  isSelected
+                    ? 'bg-apple-accent ring-white'
+                    : 'bg-apple-accent/70 ring-apple-accent/50 hover:bg-apple-accent'
+                }`}
+                style={{
+                  left: evt.start * BEAT_WIDTH,
+                  bottom: (evt.pitch - MIN_PITCH) * NOTE_HEIGHT,
+                  height: NOTE_HEIGHT - 2,
+                  width: Math.max(4, evt.duration * BEAT_WIDTH),
+                  touchAction: 'none',
+                }}
+                title={`Pitch ${evt.pitch} · start ${evt.start.toFixed(2)} · dur ${evt.duration.toFixed(2)} · vel ${evt.velocity}`}
               />
-            ))}
-
-            {/* Notes */}
-            {events.map((evt, index) => {
-              const isSelected = selectedId === String(index);
-              return (
-                <button
-                  key={`${evt.pitch}-${evt.start}-${index}`}
-                  type="button"
-                  onClick={(e) => handleSelect(e, index)}
-                  onContextMenu={(e) => handleDelete(e, index)}
-                  onPointerDown={(e) => handleNotePointerDown(e, index)}
-                  className={`absolute h-4 rounded-sm ring-1 transition ${
-                    isSelected
-                      ? 'bg-apple-accent ring-white'
-                      : 'bg-apple-accent/70 ring-apple-accent/50 hover:bg-apple-accent'
-                  }`}
-                  style={{
-                    left: evt.start * BEAT_WIDTH,
-                    bottom: (evt.pitch - MIN_PITCH) * NOTE_HEIGHT,
-                    width: Math.max(4, evt.duration * BEAT_WIDTH),
-                    touchAction: 'none',
-                  }}
-                  title={`Pitch ${evt.pitch} · start ${evt.start.toFixed(2)} · dur ${evt.duration.toFixed(2)} · vel ${evt.velocity}`}
-                />
-              );
-            })}
-          </div>
+            );
+          })}
         </div>
+      </div>
 
-        <div className="border-t border-white/10 px-4 py-2 text-xs text-apple-muted">
-          Left click grid to add · Left click note to select · Drag to move · Right click to delete · Cmd/Ctrl+Z undo/redo
-        </div>
+      <div className="flex h-7 shrink-0 items-center border-t border-apple-border bg-apple-surface-raised px-3 text-[10px] text-apple-muted">
+        Click grid to add · Click note to select · Drag to move · Right click to delete · Cmd/Ctrl+Z undo/redo
       </div>
     </div>
   );

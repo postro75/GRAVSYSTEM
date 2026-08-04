@@ -101,9 +101,22 @@ const STYLE_PROGRESSIONS: Record<string, Record<string, string[]>> = {
   },
 };
 
-export function defaultProgression(scale: Scale, style: string): string[] {
+export function defaultProgression(scale: Scale, style: string, seed = Date.now()): string[] {
+  const rng = mulberry32(seed + scale.length * 11 + style.length * 13);
   const styleMap = STYLE_PROGRESSIONS[style] ?? STYLE_PROGRESSIONS.dance;
-  return styleMap[scale] ?? styleMap.minor;
+  const base = styleMap[scale] ?? styleMap.minor;
+
+  // Jarre/ambient: occasionally add a suspended or 7th variation for color
+  if ((style === 'jarre' || style === 'ambient') && rng() > 0.6) {
+    return base.map((chord, i) => (i === 1 || i === 3 ? `${chord}sus4` : chord));
+  }
+
+  // Dance/house: occasionally swap last chord for a dominant 7 to create tension
+  if ((style === 'dance' || style === 'house') && rng() > 0.7) {
+    return base.map((chord, i) => (i === base.length - 1 ? `${chord}7` : chord));
+  }
+
+  return base;
 }
 
 const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -134,27 +147,61 @@ export function transposeProgression(
   });
 }
 
-export function defaultTrackLayout(style: string): string[] {
-  const layouts: Record<string, string[]> = {
-    jarre: ['Drums', 'Bass Seq', 'Arpeggio 1', 'Arpeggio 2', 'Pad', 'String Pad', 'Lead', 'FX'],
-    ambient: ['Drone', 'Pad', 'Arpeggio', 'Bass', 'Lead', 'FX'],
-    techno: ['Kick', 'Hats', 'Bass', 'Stab', 'Arpeggio', 'Pad'],
-    synthwave: ['Drums', 'Bass', 'Arpeggio', 'Pad', 'Lead'],
-    dance: ['Drums', 'Bass', 'Chords', 'Lead', 'FX'],
-    electro: ['Drums', 'Bass', 'Chords', 'Lead', 'FX'],
-    house: ['Drums', 'Bass', 'Chords', 'Lead', 'FX'],
+export function defaultTrackLayout(style: string, seed = Date.now()): string[] {
+  const rng = mulberry32(seed + style.length * 17);
+
+  const baseLayouts: Record<string, string[][]> = {
+    jarre: [
+      ['Drums', 'Bass Seq', 'Arpeggio 1', 'Arpeggio 2', 'Pad', 'String Pad', 'Lead', 'FX'],
+      ['Drums', 'Bass Seq', 'Arpeggio 1', 'Pad', 'String Pad', 'Lead', 'FX'],
+      ['Bass Seq', 'Arpeggio 1', 'Arpeggio 2', 'Pad', 'Drone', 'Lead'],
+    ],
+    ambient: [
+      ['Drone', 'Pad', 'Arpeggio', 'Bass', 'Lead', 'FX'],
+      ['Drone', 'Pad', 'Arpeggio', 'Lead', 'FX'],
+      ['Pad', 'Arpeggio', 'Bass', 'String Pad', 'FX'],
+    ],
+    techno: [
+      ['Kick', 'Hats', 'Bass', 'Stab', 'Arpeggio', 'Pad'],
+      ['Kick', 'Hats', 'Bass', 'Arpeggio', 'Pad', 'FX'],
+      ['Drums', 'Bass', 'Stab', 'Arpeggio', 'Pad'],
+    ],
+    synthwave: [
+      ['Drums', 'Bass', 'Arpeggio', 'Pad', 'Lead'],
+      ['Drums', 'Bass', 'Chords', 'Arpeggio', 'Lead'],
+      ['Drums', 'Bass', 'Pad', 'Lead', 'FX'],
+    ],
+    dance: [
+      ['Drums', 'Bass', 'Chords', 'Lead', 'FX'],
+      ['Drums', 'Bass', 'Chords', 'Lead', 'Pad'],
+      ['Drums', 'Bass', 'Stab', 'Lead', 'FX'],
+    ],
+    electro: [
+      ['Drums', 'Bass', 'Chords', 'Lead', 'FX'],
+      ['Drums', 'Bass', 'Stab', 'Arpeggio', 'Lead'],
+      ['Drums', 'Bass', 'Chords', 'Pad', 'Lead'],
+    ],
+    house: [
+      ['Drums', 'Bass', 'Chords', 'Lead', 'FX'],
+      ['Drums', 'Bass', 'Chords', 'Pad', 'Lead'],
+      ['Drums', 'Bass', 'Stab', 'Lead', 'FX'],
+    ],
   };
-  return layouts[style] ?? ['Drums', 'Bass', 'Arpeggio', 'Pad', 'Lead'];
+
+  const variants = baseLayouts[style] ?? [['Drums', 'Bass', 'Arpeggio', 'Pad', 'Lead']];
+  return variants[Math.floor(rng() * variants.length)];
 }
 
-export function defaultPatternType(trackName: string, style: string): string {
+export function defaultPatternType(trackName: string, style: string, seed = Date.now()): string {
+  const rng = mulberry32(seed + trackName.length * 23 + style.length * 29);
   const name = trackName.toLowerCase();
+
   if (name.includes('drum')) {
-    if (style === 'jarre') return 'jarre_drums';
+    if (style === 'jarre') return rng() > 0.5 ? 'jarre_drums' : 'electronic_sparse';
     if (style === 'ambient') return 'ambient_textures';
-    if (style === 'techno') return 'techno_drive';
-    if (style === 'synthwave') return 'synthwave_drive';
-    if (style === 'dance' || style === 'electro' || style === 'edm') return 'dance_guetta';
+    if (style === 'techno') return rng() > 0.5 ? 'techno_drive' : 'four_on_floor';
+    if (style === 'synthwave') return rng() > 0.5 ? 'synthwave_drive' : 'four_on_floor';
+    if (style === 'dance' || style === 'electro' || style === 'edm') return rng() > 0.5 ? 'dance_guetta' : 'four_on_floor';
     return 'four_on_floor';
   }
   if (name.includes('kick')) {
@@ -164,18 +211,19 @@ export function defaultPatternType(trackName: string, style: string): string {
     return style === 'techno' ? 'techno_hats' : 'hihat_16ths';
   }
   if (name.includes('bass')) {
-    if (style === 'jarre') return 'jarre_bass';
-    if (style === 'synthwave') return 'synthwave_bass';
-    if (style === 'techno') return 'techno_bass';
-    if (style === 'dance' || style === 'electro' || style === 'edm') return 'edm_bass';
+    if (style === 'jarre') return rng() > 0.5 ? 'jarre_bass' : 'root_fifth_octave';
+    if (style === 'synthwave') return rng() > 0.5 ? 'synthwave_bass' : 'root_fifth_octave';
+    if (style === 'techno') return rng() > 0.5 ? 'techno_bass' : 'analog_sequence';
+    if (style === 'dance' || style === 'electro' || style === 'edm') return rng() > 0.5 ? 'edm_bass' : 'root_fifth_octave';
     return 'root_fifth_octave';
   }
   if (name.includes('arpeggio')) {
-    if (name.includes('1')) return style === 'jarre' ? 'arp_slow_up' : 'arp_16ths';
-    return style === 'jarre' ? 'arp_slow_down' : 'arp_up';
+    const jarreArps = ['arp_slow_up', 'arp_slow_down', 'arp_up_down'];
+    if (name.includes('1')) return style === 'jarre' ? jarreArps[Math.floor(rng() * jarreArps.length)] : 'arp_16ths';
+    return style === 'jarre' ? jarreArps[Math.floor(rng() * jarreArps.length)] : rng() > 0.5 ? 'arp_up' : 'arp_up_down';
   }
   if (name.includes('chords') || name.includes('stab')) {
-    if (style === 'dance' || style === 'electro') return 'chord_stabs';
+    if (style === 'dance' || style === 'electro') return rng() > 0.5 ? 'chord_stabs' : 'chords';
     if (style === 'techno') return 'stab_chords';
     return 'chords';
   }
@@ -184,7 +232,7 @@ export function defaultPatternType(trackName: string, style: string): string {
     return style === 'jarre' ? 'ambient_pad' : 'chords';
   }
   if (name.includes('lead')) {
-    if (style === 'jarre') return 'oxygene_lead';
+    if (style === 'jarre') return rng() > 0.5 ? 'oxygene_lead' : 'melody';
     if (style === 'synthwave') return 'synthwave_lead';
     return 'melody';
   }
@@ -192,8 +240,8 @@ export function defaultPatternType(trackName: string, style: string): string {
   return 'chords';
 }
 
-export function defaultPatternTypes(layout: string[], style: string): Record<string, string> {
-  return Object.fromEntries(layout.map((track) => [track, defaultPatternType(track, style)]));
+export function defaultPatternTypes(layout: string[], style: string, seed = Date.now()): Record<string, string> {
+  return Object.fromEntries(layout.map((track) => [track, defaultPatternType(track, style, seed + track.length)]));
 }
 
 export function styleBpm(style: string): number {
@@ -312,19 +360,58 @@ export interface GenerationConfig {
   description: string;
   arrangement: ArrangementSection[];
   humanize: boolean;
+  seed: number;
 }
 
-export function defaultArrangement(bars: number, style: string): ArrangementSection[] {
+export function mulberry32(seed: number): () => number {
+  let t = seed + 0x6d2b79f5;
+  return () => {
+    t = (t + 0x6d2b79f5) | 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1) | 0;
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61) | 0;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function pickWeighted<T>(items: T[], weights: number[], rng: () => number): T {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let needle = rng() * total;
+  for (let i = 0; i < items.length; i++) {
+    needle -= weights[i];
+    if (needle <= 0) return items[i];
+  }
+  return items[items.length - 1];
+}
+
+export function defaultArrangement(bars: number, style: string, seed = Date.now()): ArrangementSection[] {
+  const rng = mulberry32(seed + bars * 31 + style.length * 7);
+
   // Ambient/Jarre: longer intro/outro, no drop
   if (style === 'ambient' || style === 'jarre') {
     if (bars >= 32) {
-      return [
-        { section: 'intro', bars: 8 },
-        { section: 'build', bars: 8 },
-        { section: 'drop', bars: 8 },
-        { section: 'break', bars: 4 },
-        { section: 'outro', bars: bars - 28 },
+      const variants: ArrangementSection[][] = [
+        [
+          { section: 'intro', bars: 8 },
+          { section: 'build', bars: 8 },
+          { section: 'drop', bars: 8 },
+          { section: 'break', bars: 4 },
+          { section: 'outro', bars: bars - 28 },
+        ],
+        [
+          { section: 'intro', bars: 12 },
+          { section: 'build', bars: 8 },
+          { section: 'drop', bars: 8 },
+          { section: 'outro', bars: bars - 28 },
+        ],
+        [
+          { section: 'intro', bars: 8 },
+          { section: 'build', bars: 4 },
+          { section: 'drop', bars: 12 },
+          { section: 'break', bars: 4 },
+          { section: 'outro', bars: bars - 28 },
+        ],
       ];
+      return variants[Math.floor(rng() * variants.length)];
     }
     return [
       { section: 'intro', bars: 4 },
@@ -334,24 +421,52 @@ export function defaultArrangement(bars: number, style: string): ArrangementSect
     ];
   }
 
-  // Dance/EDM: clear build/drop
+  // Dance/EDM: clear build/drop with variations
   if (bars >= 32) {
-    return [
-      { section: 'intro', bars: 8 },
-      { section: 'build', bars: 8 },
-      { section: 'drop', bars: 8 },
-      { section: 'break', bars: 4 },
-      { section: 'drop', bars: 4 },
-      { section: 'outro', bars: bars - 32 },
+    const variants: ArrangementSection[][] = [
+      [
+        { section: 'intro', bars: 8 },
+        { section: 'build', bars: 8 },
+        { section: 'drop', bars: 8 },
+        { section: 'break', bars: 4 },
+        { section: 'drop', bars: 4 },
+        { section: 'outro', bars: bars - 32 },
+      ],
+      [
+        { section: 'intro', bars: 4 },
+        { section: 'build', bars: 8 },
+        { section: 'drop', bars: 8 },
+        { section: 'break', bars: 4 },
+        { section: 'drop', bars: 8 },
+        { section: 'outro', bars: bars - 32 },
+      ],
+      [
+        { section: 'intro', bars: 8 },
+        { section: 'build', bars: 4 },
+        { section: 'drop', bars: 12 },
+        { section: 'break', bars: 4 },
+        { section: 'drop', bars: 4 },
+        { section: 'outro', bars: bars - 32 },
+      ],
     ];
+    return variants[Math.floor(rng() * variants.length)];
   }
   if (bars >= 24) {
-    return [
-      { section: 'intro', bars: 4 },
-      { section: 'build', bars: 8 },
-      { section: 'drop', bars: 8 },
-      { section: 'outro', bars: 4 },
+    const variants: ArrangementSection[][] = [
+      [
+        { section: 'intro', bars: 4 },
+        { section: 'build', bars: 8 },
+        { section: 'drop', bars: 8 },
+        { section: 'outro', bars: 4 },
+      ],
+      [
+        { section: 'intro', bars: 4 },
+        { section: 'build', bars: 4 },
+        { section: 'drop', bars: 12 },
+        { section: 'outro', bars: 4 },
+      ],
     ];
+    return variants[Math.floor(rng() * variants.length)];
   }
   return [
     { section: 'intro', bars: 4 },
@@ -368,6 +483,7 @@ export function buildConfig(
   const style = overrides.style || detectStyle(description);
   const bpm = overrides.bpm ?? detectBpm(description) ?? styleBpm(style);
   const bars = overrides.bars ?? detectBars(description) ?? styleBars(style);
+  const seed = overrides.seed ?? Date.now() + Math.floor(Math.random() * 100000);
   const detected = detectKeyScale(description);
   const key =
     overrides.key ??
@@ -377,10 +493,10 @@ export function buildConfig(
   const explicitChords = extractChords(description);
   const progression = explicitChords
     ? transposeProgression(explicitChords, key, scale)
-    : transposeProgression(defaultProgression(scale, style), key, scale);
-  const layout = overrides.trackLayout ?? defaultTrackLayout(style);
-  const patternTypes = overrides.patternTypes ?? defaultPatternTypes(layout, style);
-  const arrangement = overrides.arrangement ?? defaultArrangement(bars, style);
+    : transposeProgression(defaultProgression(scale, style, seed), key, scale);
+  const layout = overrides.trackLayout ?? defaultTrackLayout(style, seed);
+  const patternTypes = overrides.patternTypes ?? defaultPatternTypes(layout, style, seed);
+  const arrangement = overrides.arrangement ?? defaultArrangement(bars, style, seed);
   const humanize = overrides.humanize ?? true;
 
   return {
@@ -395,5 +511,6 @@ export function buildConfig(
     description,
     arrangement,
     humanize,
+    seed,
   };
 }

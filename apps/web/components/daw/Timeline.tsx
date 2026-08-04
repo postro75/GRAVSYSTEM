@@ -10,6 +10,7 @@ export interface TimelineProps {
   bars?: number;
   position?: number; // seconds
   bpm?: number;
+  selectedRegionId?: string | null;
   onRegionClick?: (track: Track, region: Region) => void;
   onRegionChange?: (updatedRegion: Region) => void;
   onRegionDuplicate?: (region: Region) => void;
@@ -21,12 +22,13 @@ export function Timeline({
   bars = 16,
   position = 0,
   bpm = 120,
+  selectedRegionId,
   onRegionClick,
   onRegionChange,
   onRegionDuplicate,
   onRegionDelete,
 }: TimelineProps) {
-  const [beatWidth, setBeatWidth] = useState(40);
+  const [beatWidth, setBeatWidth] = useState(48);
   const [draggingRegion, setDraggingRegion] = useState<{
     id: string;
     startBeat: number;
@@ -36,7 +38,6 @@ export function Timeline({
   const totalBeats = bars * 4;
   const secondsPerBeat = 60 / bpm;
   const positionBeats = position / secondsPerBeat;
-  const trackHeaderWidth = 192;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
@@ -47,7 +48,7 @@ export function Timeline({
     mode: 'move' | 'resize';
   } | null>(null);
 
-  const minBeatWidth = 20;
+  const minBeatWidth = 24;
   const maxBeatWidth = 120;
 
   const handleZoom = (delta: number) => {
@@ -108,48 +109,47 @@ export function Timeline({
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+    <div className="flex h-full flex-col overflow-hidden bg-apple-bg">
       {/* Toolbar */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-white/10 bg-white/5 px-3">
-        <div className="flex items-center gap-2 text-xs text-apple-muted">
-          <MoveHorizontal size={14} />
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-apple-border bg-apple-surface-raised px-3">
+        <div className="flex items-center gap-2 text-[10px] text-apple-muted">
+          <MoveHorizontal size={12} />
           <span>Drag region to move · Drag right edge to resize</span>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => handleZoom(-10)}
+            onClick={() => handleZoom(-8)}
             className="rounded p-1 text-apple-muted transition hover:bg-white/10"
             title="Zoom out"
           >
-            <ZoomOut size={14} />
+            <ZoomOut size={13} />
           </button>
           <button
             type="button"
-            onClick={() => handleZoom(10)}
+            onClick={() => handleZoom(8)}
             className="rounded p-1 text-apple-muted transition hover:bg-white/10"
             title="Zoom in"
           >
-            <ZoomIn size={14} />
+            <ZoomIn size={13} />
           </button>
         </div>
       </div>
 
       {/* Ruler */}
-      <div className="flex h-8 shrink-0 border-b border-white/10 bg-white/5">
-        <div className="w-48 shrink-0 border-r border-white/10" />
+      <div className="flex h-8 shrink-0 overflow-hidden border-b border-apple-border bg-apple-surface-raised">
         <div
           ref={containerRef}
-          className="relative flex-1 overflow-hidden"
+          className="relative h-full"
           style={{ width: totalBeats * beatWidth }}
         >
-          {Array.from({ length: totalBeats }).map((_, i) => (
+          {Array.from({ length: bars }).map((_, i) => (
             <div
               key={i}
-              className="absolute top-0 bottom-0 border-l border-white/5 text-[10px] text-apple-muted"
-              style={{ left: i * beatWidth }}
+              className="absolute top-0 bottom-0 border-l border-apple-border pl-1 text-[10px] text-apple-muted"
+              style={{ left: i * 4 * beatWidth, width: 4 * beatWidth }}
             >
-              <span className="ml-1">{i + 1}</span>
+              <span>{i + 1}</span>
             </div>
           ))}
         </div>
@@ -158,91 +158,89 @@ export function Timeline({
       {/* Tracks */}
       <div className="relative flex-1 overflow-auto">
         {tracks.length === 0 ? (
-          <div className="flex h-48 items-center justify-center text-sm text-apple-muted">
+          <div className="flex h-full items-center justify-center text-sm text-apple-muted">
             Generated tracks will appear here
           </div>
         ) : (
-          tracks.map((track) => {
-            const style = trackStyle(track.name);
-            const Icon = style.icon;
-            return (
-            <div key={track.id} className="flex h-14 border-b border-white/5 hover:bg-white/[0.02]">
-              <div className="flex w-48 shrink-0 items-center gap-2 border-r border-white/10 px-3 text-sm text-apple-text">
+          <div style={{ width: totalBeats * beatWidth }}>
+            {tracks.map((track) => {
+              const style = trackStyle(track.name);
+              return (
                 <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
-                  style={{ backgroundColor: `${style.color}30`, color: style.color }}
+                  key={track.id}
+                  className="relative h-[4.5rem] border-b border-apple-border hover:bg-white/[0.02]"
                 >
-                  <Icon size={14} />
-                </div>
-                <span className="truncate">{track.name}</span>
-              </div>
-              <div className="relative" style={{ width: totalBeats * beatWidth }}>
-                {track.regions.map((region) => {
-                  const visual = resolveRegion(region);
-                  return (
-                    <div
-                      key={region.id}
-                      className="group absolute top-2 bottom-2 cursor-grab rounded-md ring-1 transition active:cursor-grabbing"
-                      style={{
-                        left: visual.startBeat * beatWidth,
-                        width: visual.duration * beatWidth,
-                        backgroundColor: `${style.color}33`,
-                        borderColor: `${style.color}80`,
-                      }}
-                      onClick={() => onRegionClick?.(track, region)}
-                      onPointerDown={(e) => handlePointerDown(e, track, region, 'move')}
-                    >
-                      <div className="flex items-center justify-between px-1.5 py-1">
-                        <div className="truncate text-[10px] text-white/90">{region.name}</div>
-                        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-                          <button
-                            type="button"
-                            title="Duplicate region"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRegionDuplicate?.(region);
-                            }}
-                            className="rounded p-0.5 text-apple-text hover:bg-white/20"
-                          >
-                            <Copy size={10} />
-                          </button>
-                          <button
-                            type="button"
-                            title="Delete region"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRegionDelete?.(region);
-                            }}
-                            className="rounded p-0.5 text-apple-danger hover:bg-white/20"
-                          >
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      </div>
-                      {/* Resize handle */}
+                  {track.regions.map((region) => {
+                    const visual = resolveRegion(region);
+                    const isSelected = selectedRegionId === region.id;
+                    return (
                       <div
-                        className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize bg-white/20 opacity-0 transition group-hover:opacity-100"
-                        onPointerDown={(e) => {
-                          e.stopPropagation();
-                          handlePointerDown(e, track, region, 'resize');
+                        key={region.id}
+                        className={`group absolute top-2 bottom-2 cursor-grab rounded-md ring-1 transition active:cursor-grabbing ${
+                          isSelected ? 'ring-white' : ''
+                        }`}
+                        style={{
+                          left: visual.startBeat * beatWidth,
+                          width: visual.duration * beatWidth,
+                          backgroundColor: `${style.color}${isSelected ? '55' : '33'}`,
+                          borderColor: `${style.color}80`,
                         }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })
+                        onClick={() => onRegionClick?.(track, region)}
+                        onPointerDown={(e) => handlePointerDown(e, track, region, 'move')}
+                      >
+                        <div className="flex items-center justify-between px-1.5 py-1">
+                          <div className="truncate text-[10px] font-medium text-white/90">{region.name}</div>
+                          <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                            <button
+                              type="button"
+                              title="Duplicate region"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRegionDuplicate?.(region);
+                              }}
+                              className="rounded p-0.5 text-white/90 hover:bg-white/20"
+                            >
+                              <Copy size={10} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Delete region"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRegionDelete?.(region);
+                              }}
+                              className="rounded p-0.5 text-apple-danger hover:bg-white/20"
+                            >
+                              <Trash2 size={10} />
+                            </button>
+                          </div>
+                        </div>
+                        {/* Resize handle */}
+                        <div
+                          className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize bg-white/20 opacity-0 transition group-hover:opacity-100"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            handlePointerDown(e, track, region, 'resize');
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         )}
 
         {/* Playback cursor */}
-        <div
-          className="pointer-events-none absolute top-0 bottom-0 w-px bg-apple-accent"
-          style={{ left: trackHeaderWidth + positionBeats * beatWidth }}
-        />
+        {tracks.length > 0 && (
+          <div
+            className="pointer-events-none absolute top-0 bottom-0 w-px bg-apple-accent"
+            style={{ left: positionBeats * beatWidth }}
+          />
+        )}
       </div>
     </div>
   );

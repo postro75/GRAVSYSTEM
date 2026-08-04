@@ -11,6 +11,24 @@
   body {
     @apply bg-apple-bg text-apple-text;
   }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
 }
 
 @layer components {
@@ -19,15 +37,15 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-apple-sm bg-white px-5 py-2.5 text-sm font-medium text-apple-text shadow-apple-sm ring-1 ring-apple-border transition-all hover:bg-apple-bg active:scale-[0.98];
+    @apply inline-flex items-center justify-center rounded-apple-sm bg-apple-surface-raised px-5 py-2.5 text-sm font-medium text-apple-text shadow-apple-sm ring-1 ring-apple-border transition-all hover:bg-apple-surface active:scale-[0.98];
   }
 
   .card {
-    @apply rounded-apple bg-white p-6 shadow-apple ring-1 ring-apple-border/50;
+    @apply rounded-apple bg-apple-surface p-6 shadow-apple ring-1 ring-apple-border;
   }
 
   .input {
-    @apply w-full rounded-apple-sm border-apple-border bg-white px-4 py-2.5 text-sm text-apple-text outline-none ring-1 ring-apple-border transition-all placeholder:text-apple-muted focus:border-apple-accent focus:ring-apple-accent;
+    @apply w-full rounded-apple-sm border-apple-border bg-apple-surface-raised px-4 py-2.5 text-sm text-apple-text outline-none ring-1 ring-apple-border transition-all placeholder:text-apple-muted focus:border-apple-accent focus:ring-apple-accent;
   }
 
   .label {

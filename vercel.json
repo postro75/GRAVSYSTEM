@@ -1,7 +1,33 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build --workspace=apps/web",
-  "outputDirectory": "apps/web/.next",
-  "framework": "nextjs"
+  "services": {
+    "gravsystem-web": {
+      "root": "apps/web",
+      "framework": "nextjs",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build",
+      "outputDirectory": ".next"
+    },
+    "gravsystem-api": {
+      "root": "apps/api",
+      "framework": "fastapi",
+      "entrypoint": "main:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "gravsystem-api"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "gravsystem-web"
+      }
+    }
+  ]
 }

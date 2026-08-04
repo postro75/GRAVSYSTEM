@@ -55,7 +55,8 @@ describe('music theory', () => {
     expect(config.key).toBe('D');
     expect(config.scale).toBe('minor');
     expect(config.style).toBe('jarre');
-    expect(config.chordProgression).toEqual(defaultProgression('minor', 'jarre'));
+    expect(config.seed).toBeDefined();
+    expect(config.chordProgression).toEqual(defaultProgression('minor', 'jarre', config.seed));
   });
 
   it('uses style defaults when no overrides', () => {

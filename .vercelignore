@@ -14,3 +14,6 @@ __pycache__/
 release/
 apps/web/release/
 apps/web/dist/
+docker-compose.yml
+render.yaml
+pnpm-workspace.yaml

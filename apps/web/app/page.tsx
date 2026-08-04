@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
-import { PromptBar } from '@/components/daw/PromptBar';
-import { Transport } from '@/components/daw/Transport';
+import { Toolbar } from '@/components/daw/Toolbar';
+import { TrackHeaders } from '@/components/daw/TrackHeaders';
 import { Timeline } from '@/components/daw/Timeline';
-import { PianoRoll } from '@/components/daw/PianoRoll';
-import { Mixer } from '@/components/daw/Mixer';
-import { GenerationForm } from '@/components/GenerationForm';
+import { Inspector } from '@/components/daw/Inspector';
+import { BottomPanel } from '@/components/daw/BottomPanel';
+import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
 import { Project, ProjectSchema, Region, Track } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
@@ -23,7 +23,7 @@ import {
   exportProjectsJson,
   importProjectsJson,
 } from '@/lib/storage';
-import { Loader2, Download, Upload, FolderOpen, SlidersHorizontal, Info, X } from 'lucide-react';
+import { Loader2, Info, X } from 'lucide-react';
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -46,10 +46,12 @@ export default function Home() {
   });
   const [position, setPosition] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
-  const [showMixer, setShowMixer] = useState(false);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(true);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
+  const [prompt, setPrompt] = useState('');
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -86,6 +88,7 @@ export default function Home() {
         const last = stored.find((p) => p.id === lastId);
         if (last) {
           setDawProject(last);
+          setSelectedTrackId(last.tracks[0]?.id ?? null);
           playerRef.current?.loadProject(last);
         }
       }
@@ -120,6 +123,8 @@ export default function Home() {
       const validated = ProjectSchema.parse(project);
       setProjects((prev) => [validated, ...prev]);
       setDawProject(validated);
+      setSelectedTrackId(validated.tracks[0]?.id ?? null);
+      setSelectedRegion(null);
       await playerRef.current?.loadProject(validated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -128,7 +133,9 @@ export default function Home() {
     }
   };
 
-  const handlePromptGenerate = (description: string) => {
+  const handlePromptGenerate = () => {
+    const description = prompt.trim();
+    if (!description) return;
     const lowered = description.toLowerCase();
     const style =
       ['jarre', 'ambient', 'synthwave', 'techno', 'house', 'electro', 'dance'].find((s) =>
@@ -136,8 +143,6 @@ export default function Home() {
       ) || 'dance';
     runGeneration({ description, style, outputType: 'mid' });
   };
-
-  const handleClassicGenerate = (request: FormGenerationRequest) => runGeneration(request);
 
   const handlePlay = async () => {
     if (!playerState.isReady) {
@@ -162,6 +167,10 @@ export default function Home() {
       updatedAt: new Date().toISOString(),
     };
     setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+    if (selectedRegion?.id === updatedRegion.id) {
+      setSelectedRegion(updatedRegion);
+    }
     await playerRef.current?.loadProject(nextProject);
   };
 
@@ -218,9 +227,7 @@ export default function Home() {
       updatedAt: new Date().toISOString(),
     };
     setDawProject(nextProject);
-    setProjects((prev) =>
-      prev.map((p) => (p.id === nextProject.id ? nextProject : p))
-    );
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
   };
 
   const handleExportMidi = () => {
@@ -285,6 +292,8 @@ export default function Home() {
       setProjects(imported);
       if (imported[0]) {
         setDawProject(imported[0]);
+        setSelectedTrackId(imported[0].tracks[0]?.id ?? null);
+        setSelectedRegion(null);
         await playerRef.current?.loadProject(imported[0]);
       }
     } catch (err) {
@@ -292,192 +301,174 @@ export default function Home() {
     }
   };
 
+  const handleLoadProject = (project: Project) => {
+    setDawProject(project);
+    setSelectedTrackId(project.tracks[0]?.id ?? null);
+    setSelectedRegion(null);
+    playerRef.current?.loadProject(project);
+    setIsProjectManagerOpen(false);
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    if (dawProject?.id === projectId) {
+      setDawProject(null);
+      setSelectedTrackId(null);
+      setSelectedRegion(null);
+    }
+  };
+
+  const handleRenameProject = (projectId: string, title: string) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, title, updatedAt: new Date().toISOString() } : p))
+    );
+    if (dawProject?.id === projectId) {
+      setDawProject((prev) => (prev ? { ...prev, title, updatedAt: new Date().toISOString() } : prev));
+    }
+  };
+
+  const handleRegionClick = (track: Track, region: Region) => {
+    setSelectedRegion(region);
+    setSelectedTrackId(track.id);
+  };
+
+  const selectedTrack = dawProject?.tracks.find((t) => t.id === selectedTrackId) ?? null;
+
   return (
     <div className="flex h-screen flex-col bg-apple-bg">
       <Header />
 
-      <main className="flex flex-1 flex-col gap-4 p-4">
-        <PromptBar onGenerate={handlePromptGenerate} isGenerating={isGenerating} />
-        <Transport
-          isPlaying={playerState.isPlaying}
-          bpm={dawProject?.bpm ?? 120}
-          position={formatTime(position)}
-          metronomeEnabled={metronomeEnabled}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
-          onMetronomeToggle={handleToggleMetronome}
+      <Toolbar
+        prompt={prompt}
+        onPromptChange={setPrompt}
+        onGenerate={handlePromptGenerate}
+        isGenerating={isGenerating}
+        isPlaying={playerState.isPlaying}
+        bpm={dawProject?.bpm ?? 120}
+        key={dawProject?.key ?? 'D'}
+        scale={dawProject?.scale ?? 'minor'}
+        position={formatTime(position)}
+        metronomeEnabled={metronomeEnabled}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onStop={handleStop}
+        onMetronomeToggle={handleToggleMetronome}
+        onExportMidi={handleExportMidi}
+        onExportWav={handleExportWav}
+        onExportRpp={handleExportRpp}
+        onExportJson={handleExportJson}
+        onImportJson={handleImportJson}
+        onOpenProjects={() => setIsProjectManagerOpen(true)}
+        canExport={!!dawProject}
+        isRendering={isRendering}
+      />
+
+      {!playerState.isReady && !playerState.loading && (
+        <button
+          onClick={handleEnableAudio}
+          className="flex w-full items-center justify-center gap-2 border-b border-apple-border bg-apple-accent/10 px-4 py-2 text-sm font-medium text-apple-accent transition hover:bg-apple-accent/20"
+        >
+          Enable Audio
+        </button>
+      )}
+
+      {showHints && (
+        <div className="flex items-start gap-3 border-b border-apple-border bg-apple-surface-raised px-4 py-2 text-sm text-apple-text">
+          <Info size={16} className="mt-0.5 shrink-0 text-apple-accent" />
+          <div className="flex-1 space-y-1">
+            <p className="font-medium">Getting started</p>
+            <p className="text-xs text-apple-muted">
+              1. Type a style like &quot;Jean-Michel Jarre ambient space&quot; or &quot;Kavinsky synthwave&quot; and click Generate.
+            </p>
+            <p className="text-xs text-apple-muted">
+              2. Press Play. If you see <strong>Enable Audio</strong> above, click it first — browsers require a click to start sound.
+            </p>
+            <p className="text-xs text-apple-muted">
+              3. Click any region to edit notes in the Piano Roll, or switch to the Mixer tab to adjust volume and pan.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowHints(false)}
+            className="shrink-0 rounded p-1 text-apple-muted hover:bg-white/10"
+            title="Hide hints"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex w-full items-center justify-between border-b border-apple-danger/30 bg-apple-danger/10 px-4 py-2 text-sm text-apple-danger">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="rounded p-1 hover:bg-white/10">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <main className="flex min-h-0 flex-1">
+        <TrackHeaders
+          tracks={dawProject?.tracks ?? []}
+          selectedTrackId={selectedTrackId}
+          onTrackChange={handleTrackChange}
+          onSelectTrack={setSelectedTrackId}
         />
 
-        {showHints && (
-          <div className="flex items-start gap-3 rounded-xl border border-apple-accent/30 bg-apple-accent/10 px-4 py-3 text-sm text-apple-text">
-            <Info size={16} className="mt-0.5 shrink-0 text-apple-accent" />
-            <div className="flex-1 space-y-1">
-              <p className="font-medium">Getting started</p>
-              <p className="text-xs text-apple-muted">
-                1. Type a style like &quot;Jean-Michel Jarre ambient space&quot; or &quot;Kavinsky synthwave&quot; and click Generate.
-              </p>
-              <p className="text-xs text-apple-muted">
-                2. Press Play. If you see <strong>Enable Audio</strong> below, click it first — browsers require a click to start sound.
-              </p>
-              <p className="text-xs text-apple-muted">
-                3. Click any region to edit notes, or open the Mixer to adjust volume and pan.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowHints(false)}
-              className="shrink-0 rounded p-1 text-apple-muted hover:bg-white/10"
-              title="Hide hints"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
-        {!playerState.isReady && !playerState.loading && (
-          <button
-            onClick={handleEnableAudio}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-apple-accent/30 bg-apple-accent/10 px-4 py-2 text-sm font-medium text-apple-accent transition hover:bg-apple-accent/20"
-          >
-            Enable Audio
-          </button>
-        )}
-
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {dawProject && dawProject.tracks.length > 0 && (
-              <button
-                onClick={() => setShowMixer((v) => !v)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                  showMixer
-                    ? 'border-apple-accent/50 bg-apple-accent/10 text-apple-accent'
-                    : 'border-white/10 bg-white/5 text-apple-text hover:bg-white/10'
-                }`}
-              >
-                <SlidersHorizontal size={14} />
-                {showMixer ? 'Hide Mixer' : 'Show Mixer'}
-              </button>
-            )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1">
+            <Timeline
+              tracks={dawProject?.tracks ?? []}
+              bars={dawProject?.bars ?? 16}
+              position={position}
+              bpm={dawProject?.bpm ?? 120}
+              selectedRegionId={selectedRegion?.id}
+              onRegionClick={handleRegionClick}
+              onRegionChange={handleRegionChange}
+              onRegionDuplicate={handleRegionDuplicate}
+              onRegionDelete={handleRegionDelete}
+            />
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportJson}
-              disabled={projects.length === 0}
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-            >
-              <FolderOpen size={14} />
-              Export JSON
-            </button>
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10">
-              <Upload size={14} />
-              Import JSON
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImportJson(file);
-                  e.currentTarget.value = '';
-                }}
-              />
-            </label>
-            <button
-              onClick={handleExportRpp}
-              disabled={!dawProject}
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-            >
-              <Download size={14} />
-              Export REAPER
-            </button>
-            <button
-              onClick={handleExportMidi}
-              disabled={!dawProject}
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-            >
-              <Download size={14} />
-              Export MIDI
-            </button>
-            <button
-              onClick={handleExportWav}
-              disabled={!dawProject || isRendering}
-              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-apple-text transition hover:bg-white/10 disabled:opacity-40"
-            >
-              {isRendering ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              Export WAV
-            </button>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1">
-          <Timeline
+          <BottomPanel
             tracks={dawProject?.tracks ?? []}
-            bars={dawProject?.bars ?? 16}
-            position={position}
+            selectedRegion={selectedRegion}
             bpm={dawProject?.bpm ?? 120}
-            onRegionClick={(_, region) => setSelectedRegion(region)}
             onRegionChange={handleRegionChange}
-            onRegionDuplicate={handleRegionDuplicate}
-            onRegionDelete={handleRegionDelete}
+            onTrackChange={handleTrackChange}
           />
         </div>
 
-        {showMixer && dawProject && dawProject.tracks.length > 0 && (
-          <Mixer tracks={dawProject.tracks} onChange={handleTrackChange} />
-        )}
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h2 className="mb-3 text-sm font-semibold text-apple-text">Classic generator</h2>
-          <GenerationForm onGenerate={handleClassicGenerate} isGenerating={isGenerating} />
-
-          {error && (
-            <div className="mt-3 rounded-xl border border-apple-danger/30 bg-apple-danger/10 px-4 py-3 text-sm text-apple-danger">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-4 space-y-3">
-            {projects.length === 0 ? (
-              <p className="text-sm text-apple-muted">No projects yet. Generate one above.</p>
-            ) : (
-              projects.map((project) => (
-                <button
-                  key={project.id}
-                  type="button"
-                  onClick={() => {
-                    setDawProject(project);
-                    playerRef.current?.loadProject(project);
-                  }}
-                  className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition ${
-                    dawProject?.id === project.id
-                      ? 'border-apple-accent/50 bg-apple-accent/10'
-                      : 'border-white/10 bg-white/5 hover:bg-white/[0.07]'
-                  }`}
-                >
-                  <div className="font-medium text-apple-text">{project.title}</div>
-                  <div className="text-apple-muted">
-                    {project.bpm} BPM · {project.key} {project.scale} · {project.tracks.length} tracks
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </section>
+        <Inspector
+          project={
+            dawProject
+              ? {
+                  title: dawProject.title,
+                  bpm: dawProject.bpm,
+                  key: dawProject.key,
+                  scale: dawProject.scale,
+                  bars: dawProject.bars,
+                  style: dawProject.style,
+                }
+              : null
+          }
+          selectedTrack={selectedTrack}
+          selectedRegion={selectedRegion}
+        />
       </main>
 
-      {selectedRegion && dawProject && (
-        <PianoRoll
-          region={selectedRegion}
-          bpm={dawProject.bpm}
-          onChange={handleRegionChange}
-          onClose={() => setSelectedRegion(null)}
-        />
-      )}
+      <ProjectManager
+        projects={projects}
+        currentProjectId={dawProject?.id}
+        isOpen={isProjectManagerOpen}
+        onClose={() => setIsProjectManagerOpen(false)}
+        onLoad={handleLoadProject}
+        onDelete={handleDeleteProject}
+        onRename={handleRenameProject}
+      />
 
       {isGenerating && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="flex items-center gap-3 rounded-apple bg-white px-6 py-4 shadow-apple">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-apple bg-apple-surface px-6 py-4 shadow-apple ring-1 ring-apple-border">
             <Loader2 size={20} className="animate-spin text-apple-accent" />
             <span className="text-sm font-medium text-apple-text">Generating your project...</span>
           </div>

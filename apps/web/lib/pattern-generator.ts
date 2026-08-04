@@ -10,6 +10,7 @@ export interface GenerationContext {
   barIndex: number;
   style: string;
   humanize: boolean;
+  seed: number;
 }
 
 function humanizeVelocity(velocity: number, rng: () => number): number {
@@ -59,9 +60,10 @@ export function generateDrumPattern(
 ): RawEvent[] {
   const events: RawEvent[] = [];
   const stepTicks = barTicks / 16;
-  const rng = mulberry32(ctx.barIndex * 12345 + patternType.length);
+  const rng = mulberry32(ctx.seed + ctx.barIndex * 12345 + patternType.length);
   const isFill = ctx.barIndex > 0 && ctx.barIndex % 4 === 3;
   const section = ctx.section;
+  const fillIntensity = 0.8 + rng() * 0.4; // per-bar variation
 
   function add(step: number, note: number, velocity: number, durationFactor = 1.0): void {
     let vel = velocity;
@@ -99,24 +101,25 @@ export function generateDrumPattern(
 
     if (patternType === 'four_on_floor' || patternType === 'techno_kick') {
       if (isKickStep && !kickOnly) {
-        const vel = (patternType === 'techno_kick' ? 120 : 110) * intensity;
-        add(step, DRUM_NOTES.kick, vel + (isFill ? rng() * 10 : 0), 0.6);
+        const baseVel = patternType === 'techno_kick' ? 120 : 110;
+        const accent = step === 0 ? 10 : 0;
+        add(step, DRUM_NOTES.kick, (baseVel + accent) * intensity * fillIntensity, 0.6);
       }
       if (patternType === 'four_on_floor' && !kickOnly) {
-        if (isOffbeat) add(step, DRUM_NOTES.hihatClosed, 70 * intensity + rng() * 15, 0.3);
-        if (isBackbeat) add(step, DRUM_NOTES.clap, 100 * intensity, 0.5);
+        if (isOffbeat) add(step, DRUM_NOTES.hihatClosed, (70 + rng() * 20) * intensity * fillIntensity, 0.3);
+        if (isBackbeat) add(step, DRUM_NOTES.clap, (100 + rng() * 10) * intensity * fillIntensity, 0.5);
         if (isFill && step > 10 && step % 2 === 0) {
-          add(step, DRUM_NOTES.snare, 90 * intensity + rng() * 20, 0.4);
+          add(step, DRUM_NOTES.snare, (90 + rng() * 30) * intensity * fillIntensity, 0.4);
         }
       }
     } else if (patternType === 'techno_hats' && !kickOnly) {
-      const vel = step % 2 === 0 ? 60 + rng() * 10 : 45 + rng() * 10;
-      add(step, DRUM_NOTES.hihatClosed, vel * intensity, 0.2);
-      if (isOffbeat) add(step, DRUM_NOTES.hihatOpen, 75 * intensity + rng() * 10, 0.3);
+      const vel = step % 2 === 0 ? 60 + rng() * 15 : 45 + rng() * 15;
+      add(step, DRUM_NOTES.hihatClosed, vel * intensity * fillIntensity, 0.2);
+      if (isOffbeat) add(step, DRUM_NOTES.hihatOpen, (75 + rng() * 15) * intensity * fillIntensity, 0.3);
     } else if (patternType === 'techno_drive' && !kickOnly) {
-      if (isKickStep) add(step, DRUM_NOTES.kick, 120 * intensity, 0.5);
-      add(step, DRUM_NOTES.hihatClosed, step % 2 === 0 ? 65 : 50, 0.2);
-      if (isBackbeat) add(step, DRUM_NOTES.snare, 105 * intensity + rng() * 10, 0.4);
+      if (isKickStep) add(step, DRUM_NOTES.kick, 120 * intensity * fillIntensity, 0.5);
+      add(step, DRUM_NOTES.hihatClosed, (step % 2 === 0 ? 65 : 50) * intensity * fillIntensity, 0.2);
+      if (isBackbeat) add(step, DRUM_NOTES.snare, (105 + rng() * 15) * intensity * fillIntensity, 0.4);
     } else if (patternType === 'jarre_drums') {
       // Oxygène-style: sparse kick, backbeat snare, open hats on the offbeat.
       if (step % 8 === 0) add(step, DRUM_NOTES.kick, 95 * intensity, 1.0);
@@ -165,7 +168,7 @@ export function generateBassPattern(
 ): RawEvent[] {
   const events: RawEvent[] = [];
   const stepTicks = barTicks / 16;
-  const rng = mulberry32(ctx.barIndex * 67890 + patternType.length);
+  const rng = mulberry32(ctx.seed + ctx.barIndex * 67890 + patternType.length);
   const root = chord.root;
   const section = ctx.section;
 
@@ -203,10 +206,32 @@ export function generateBassPattern(
   const intensity = section === 'drop' ? 1.1 : section === 'build' ? 0.95 : 1;
 
   if (patternType === 'root_fifth_octave') {
-    add(0, rootMidi(2), 110 * intensity, 4);
-    add(4, fifthMidi(2), 100 * intensity, 4);
-    add(8, rootMidi(3), 105 * intensity, 4);
-    add(12, fifthMidi(2), 100 * intensity, 4);
+    const variants: Array<[number, number, number, number][]> = [
+      [
+        [0, rootMidi(2), 110, 4],
+        [4, fifthMidi(2), 100, 4],
+        [8, rootMidi(3), 105, 4],
+        [12, fifthMidi(2), 100, 4],
+      ],
+      [
+        [0, rootMidi(2), 115, 8],
+        [8, fifthMidi(2), 100, 8],
+      ],
+      [
+        [0, rootMidi(2), 110, 2],
+        [2, rootMidi(2), 95, 2],
+        [4, fifthMidi(2), 105, 2],
+        [6, fifthMidi(2), 90, 2],
+        [8, rootMidi(3), 110, 2],
+        [10, rootMidi(3), 95, 2],
+        [12, fifthMidi(2), 100, 2],
+        [14, rootMidi(2), 95, 2],
+      ],
+    ];
+    const chosen = variants[Math.floor(rng() * variants.length)];
+    for (const [step, note, vel, dur] of chosen) {
+      add(step, note, vel * intensity, dur);
+    }
   } else if (patternType === 'analog_sequence') {
     for (let step = 0; step < 8; step++) {
       const note = step % 4 === 0 ? rootMidi(2) : step % 4 === 2 ? fifthMidi(2) : rootMidi(3);
@@ -250,7 +275,7 @@ export function generateArpeggioPattern(
   octaveShift: number
 ): RawEvent[] {
   const events: RawEvent[] = [];
-  const rng = mulberry32(ctx.barIndex * 11111 + patternType.length);
+  const rng = mulberry32(ctx.seed + ctx.barIndex * 11111 + patternType.length);
   const baseOctave = ctx.style === 'jarre' ? 4 : 5;
   const notes = chord.notes.map((n) => (n % 12) + (baseOctave + octaveShift + 1) * 12);
   const section = ctx.section;
@@ -299,7 +324,7 @@ export function generateChordPattern(
   ctx: GenerationContext
 ): RawEvent[] {
   const events: RawEvent[] = [];
-  const rng = mulberry32(ctx.barIndex * 22222 + patternType.length);
+  const rng = mulberry32(ctx.seed + ctx.barIndex * 22222 + patternType.length);
   const baseOctave = 4;
   const notes = chord.notes.map((n) => (n % 12) + (baseOctave + 1) * 12);
   const section = ctx.section;
@@ -366,7 +391,7 @@ export function generateLeadPattern(
   ctx: GenerationContext
 ): RawEvent[] {
   const events: RawEvent[] = [];
-  const rng = mulberry32(ctx.barIndex * 33333 + patternType.length);
+  const rng = mulberry32(ctx.seed + ctx.barIndex * 33333 + patternType.length);
   const baseOctave = ctx.style === 'jarre' ? 5 : 6;
   const sourceNotes = chord.notes.length >= 3 ? chord.notes : scale;
   const shifted = sourceNotes.map((n) => (n % 12) + (baseOctave + 1) * 12);
@@ -393,14 +418,22 @@ export function generateLeadPattern(
   } else if (patternType === 'melody') {
     const phraseLength = section === 'intro' || section === 'outro' ? 4 : 8;
     const stepTicks = barTicks / phraseLength;
+    const phrase = Math.floor(rng() * 3);
     for (let step = 0; step < phraseLength; step++) {
-      if (step % 2 === 0 || (step === 3 && rng() > 0.3)) {
-        const note = shifted[(step + ctx.barIndex) % shifted.length];
+      const shouldPlay =
+        phrase === 0
+          ? step % 2 === 0
+          : phrase === 1
+          ? step % 2 === 0 || step === 3
+          : step === 0 || step === 3 || step === 5 || step === 7;
+      if (shouldPlay && rng() > 0.15) {
+        const notePool = rng() > 0.7 && scale.length > 0 ? scale : shifted;
+        const note = notePool[(step + ctx.barIndex) % notePool.length];
         add(
           step * stepTicks,
           stepTicks * (rng() > 0.5 ? 1.2 : 0.8),
           note,
-          (80 + rng() * 20) * intensity
+          (80 + rng() * 25) * intensity
         );
       }
     }
@@ -514,6 +547,7 @@ export function generateMidiEvents(config: GenerationConfig): Record<string, Raw
         barIndex: bar,
         style: config.style,
         humanize: config.humanize,
+        seed: config.seed,
       };
       const barEvents = generateTrackEvents(trackName, pattern, chord, scale, ctx);
 
