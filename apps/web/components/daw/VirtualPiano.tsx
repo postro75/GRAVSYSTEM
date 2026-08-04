@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Mic, Square, Circle } from 'lucide-react';
+import { Mic, Square, Circle, Usb } from 'lucide-react';
 import { Region } from '@gravsystem/core';
 
 export interface VirtualPianoProps {
   selectedRegion?: Region | null;
-  onPreview?: (pitch: number) => void;
+  getRecordPosition?: () => number;
+  onPreview?: (pitch: number, velocity: number) => void;
   onRecordNote?: (note: { pitch: number; velocity: number; start: number; duration: number }) => void;
 }
 
@@ -24,38 +25,112 @@ function noteName(note: number): string {
   return `${names[note % 12]}${octave}`;
 }
 
-export function VirtualPiano({ selectedRegion, onPreview, onRecordNote }: VirtualPianoProps) {
+export function VirtualPiano({ selectedRegion, getRecordPosition, onPreview, onRecordNote }: VirtualPianoProps) {
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
-  const recordingStartRef = useRef<number>(0);
+  const [midiDevices, setMidiDevices] = useState(0);
   const heldRef = useRef<Set<number>>(new Set());
+  const recordingNotesRef = useRef<Map<number, { start: number; velocity: number }>>(new Map());
+  const midiAccessRef = useRef<MIDIAccess | null>(null);
+
+  const recordNoteOn = useCallback(
+    (pitch: number, velocity: number) => {
+      if (!selectedRegion || !isRecording) return;
+      const start = getRecordPosition ? getRecordPosition() : 0;
+      recordingNotesRef.current.set(pitch, { start: Math.max(0, start), velocity });
+    },
+    [selectedRegion, isRecording, getRecordPosition]
+  );
+
+  const recordNoteOff = useCallback(
+    (pitch: number) => {
+      if (!selectedRegion || !isRecording) return;
+      const note = recordingNotesRef.current.get(pitch);
+      if (!note) return;
+      const end = getRecordPosition ? getRecordPosition() : note.start + 0.5;
+      const duration = Math.max(0.05, end - note.start);
+      onRecordNote?.({
+        pitch,
+        velocity: note.velocity,
+        start: note.start,
+        duration,
+      });
+      recordingNotesRef.current.delete(pitch);
+    },
+    [selectedRegion, isRecording, getRecordPosition, onRecordNote]
+  );
 
   const startNote = useCallback(
-    (pitch: number) => {
+    (pitch: number, velocity = 100) => {
       if (heldRef.current.has(pitch)) return;
       heldRef.current.add(pitch);
       setActiveNotes(new Set(heldRef.current));
-      onPreview?.(pitch);
-
-      if (isRecording && selectedRegion) {
-        recordingStartRef.current = recordingStartRef.current || 0; // placeholder for future transport sync
-        // For now record at start of region with default duration; transport-sync can be added later.
-        onRecordNote?.({
-          pitch,
-          velocity: 100,
-          start: 0,
-          duration: 0.5,
-        });
-      }
+      onPreview?.(pitch, velocity);
+      recordNoteOn(pitch, velocity);
     },
-    [isRecording, onPreview, onRecordNote, selectedRegion]
+    [onPreview, recordNoteOn]
   );
 
-  const stopNote = useCallback((pitch: number) => {
-    heldRef.current.delete(pitch);
-    setActiveNotes(new Set(heldRef.current));
-  }, []);
+  const stopNote = useCallback(
+    (pitch: number) => {
+      if (!heldRef.current.has(pitch)) return;
+      heldRef.current.delete(pitch);
+      setActiveNotes(new Set(heldRef.current));
+      recordNoteOff(pitch);
+    },
+    [recordNoteOff]
+  );
 
+  // Web MIDI support
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('requestMIDIAccess' in navigator)) return;
+
+    let cancelled = false;
+    navigator
+      .requestMIDIAccess({ sysex: false })
+      .then((access) => {
+        if (cancelled) return;
+        midiAccessRef.current = access;
+        setMidiDevices(access.inputs.size);
+
+        const handleMessage = (evt: MIDIMessageEvent) => {
+          const data = evt.data;
+          if (!data || data.length < 3) return;
+          const status = data[0] & 0xf0;
+          const pitch = data[1];
+          const velocity = data[2];
+
+          if (status === 0x90 && velocity > 0) {
+            startNote(pitch, velocity);
+          } else if (status === 0x80 || (status === 0x90 && velocity === 0)) {
+            stopNote(pitch);
+          }
+        };
+
+        access.inputs.forEach((input) => {
+          input.onmidimessage = handleMessage;
+        });
+
+        access.onstatechange = () => {
+          setMidiDevices(access.inputs.size);
+          access.inputs.forEach((input) => {
+            if (!input.onmidimessage) input.onmidimessage = handleMessage;
+          });
+        };
+      })
+      .catch(() => {
+        // MIDI access denied or unsupported — ignore gracefully.
+      });
+
+    return () => {
+      cancelled = true;
+      midiAccessRef.current?.inputs.forEach((input) => {
+        input.onmidimessage = null;
+      });
+    };
+  }, [startNote, stopNote]);
+
+  // Computer keyboard support
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -64,7 +139,7 @@ export function VirtualPiano({ selectedRegion, onPreview, onRecordNote }: Virtua
       const pitch = START_OCTAVE * 12 + offset;
       if (pitch >= 0 && pitch <= 127) {
         e.preventDefault();
-        startNote(pitch);
+        startNote(pitch, 100);
       }
     };
 
@@ -97,6 +172,12 @@ export function VirtualPiano({ selectedRegion, onPreview, onRecordNote }: Virtua
       <div className="mb-2 flex items-center justify-between">
         <div className="text-xs font-semibold text-apple-text">Virtual Piano</div>
         <div className="flex items-center gap-2">
+          {midiDevices > 0 && (
+            <div className="flex items-center gap-1 rounded-apple-sm border border-apple-border bg-apple-surface px-2 py-1 text-[10px] text-apple-muted">
+              <Usb size={10} />
+              MIDI {midiDevices}
+            </div>
+          )}
           <button
             onClick={() => setIsRecording((v) => !v)}
             disabled={!selectedRegion}
@@ -121,10 +202,10 @@ export function VirtualPiano({ selectedRegion, onPreview, onRecordNote }: Virtua
             <button
               key={note}
               type="button"
-              onMouseDown={() => startNote(note)}
+              onMouseDown={() => startNote(note, 100)}
               onMouseUp={() => stopNote(note)}
               onMouseLeave={() => stopNote(note)}
-              onTouchStart={() => startNote(note)}
+              onTouchStart={() => startNote(note, 100)}
               onTouchEnd={() => stopNote(note)}
               className={`relative flex h-full w-10 flex-col justify-end border-r border-apple-border pb-1 text-[9px] transition ${
                 activeNotes.has(note)
@@ -144,10 +225,10 @@ export function VirtualPiano({ selectedRegion, onPreview, onRecordNote }: Virtua
               <button
                 key={blackNote}
                 type="button"
-                onMouseDown={() => startNote(blackNote)}
+                onMouseDown={() => startNote(blackNote, 100)}
                 onMouseUp={() => stopNote(blackNote)}
                 onMouseLeave={() => stopNote(blackNote)}
-                onTouchStart={() => startNote(blackNote)}
+                onTouchStart={() => startNote(blackNote, 100)}
                 onTouchEnd={() => stopNote(blackNote)}
                 style={{ left: `${(index + 1) * 40 - 12}px` }}
                 className={`absolute top-0 z-10 h-[60%] w-6 rounded-b-sm text-[8px] transition ${
@@ -165,7 +246,9 @@ export function VirtualPiano({ selectedRegion, onPreview, onRecordNote }: Virtua
 
       <div className="mt-2 flex items-center gap-2 text-[10px] text-apple-muted">
         <Mic size={12} />
-        <span>Use keyboard keys A–L for white/black keys. Recording writes notes to the selected region.</span>
+        <span>
+          Use keyboard keys A–L or a MIDI controller. Recording writes notes at the current playhead.
+        </span>
       </div>
     </div>
   );

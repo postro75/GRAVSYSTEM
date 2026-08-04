@@ -10,7 +10,7 @@ import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
 import { getInstrumentById } from '@/lib/instruments';
-import { Project, ProjectSchema, Region, Track } from '@gravsystem/core';
+import { Project, ProjectSchema, Region, Track, InstrumentParams } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
 import { downloadRpp } from '@/lib/rpp-export';
@@ -54,6 +54,7 @@ export default function Home() {
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('piano');
+  const [meterLevels, setMeterLevels] = useState<Record<string, number>>({});
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -66,6 +67,7 @@ export default function Home() {
     const updatePosition = () => {
       if (playerRef.current) {
         setPosition(playerRef.current.getPositionSeconds());
+        setMeterLevels(playerRef.current.getMeterValues());
       }
       raf = requestAnimationFrame(updatePosition);
     };
@@ -225,6 +227,20 @@ export default function Home() {
       ...dawProject,
       tracks: dawProject.tracks.map((track) =>
         track.id === trackId ? { ...track, ...updates } : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+  };
+
+  const handleInstrumentParamsChange = (trackId: string, params: InstrumentParams) => {
+    if (!dawProject) return;
+    playerRef.current?.updateInstrumentParams(trackId, params);
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.id === trackId ? { ...track, instrumentParams: params } : track
       ),
       updatedAt: new Date().toISOString(),
     };
@@ -457,6 +473,7 @@ export default function Home() {
         <TrackHeaders
           tracks={dawProject?.tracks ?? []}
           selectedTrackId={selectedTrackId}
+          meterLevels={meterLevels}
           onTrackChange={handleTrackChange}
           onSelectTrack={setSelectedTrackId}
         />
@@ -487,9 +504,12 @@ export default function Home() {
             onActiveTabChange={setActiveBottomTab}
             onRegionChange={handleRegionChange}
             onTrackChange={handleTrackChange}
-            onPreviewNote={(trackId, pitch) => playerRef.current?.previewNote(trackId, pitch, 100, 0.4)}
+            onPreviewNote={(trackId, pitch, velocity) =>
+              playerRef.current?.previewNote(trackId, pitch, velocity ?? 100, 0.4)
+            }
             onRecordNote={handleRecordNote}
             onPreviewChord={handlePreviewChord}
+            getRecordPosition={() => playerRef.current?.getPositionBeats() ?? 0}
           />
         </div>
 
@@ -510,6 +530,7 @@ export default function Home() {
           selectedRegion={selectedRegion}
           onInstrumentSelect={handleInstrumentSelect}
           onInstrumentPreview={handleInstrumentPreview}
+          onInstrumentParamsChange={handleInstrumentParamsChange}
         />
       </main>
 

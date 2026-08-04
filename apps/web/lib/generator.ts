@@ -1,4 +1,12 @@
-import { Project, Track, createProject, createTrack, createRegion, GenerationRequest } from '@gravsystem/core';
+import {
+  Project,
+  Track,
+  createProject,
+  createTrack,
+  createRegion,
+  GenerationRequest,
+  DEFAULT_INSTRUMENT_PARAMS,
+} from '@gravsystem/core';
 import { buildConfig } from './music-theory';
 import { generateMidiEvents, eventsToMidiEvents } from './pattern-generator';
 import { inferInstrumentForTrack, getInstrumentById } from './instruments';
@@ -23,6 +31,7 @@ export function generateProject(request: GenerationRequest): Project {
       type: 'midi',
       instrument: instrumentId,
       instrumentType: instrumentDef?.type ?? 'custom',
+      instrumentParams: DEFAULT_INSTRUMENT_PARAMS,
       channel: tracks.length + 1,
     });
 

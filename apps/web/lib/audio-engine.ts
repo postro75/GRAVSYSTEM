@@ -8,6 +8,13 @@ import {
   inferInstrumentForTrack,
   type InstrumentDefinition,
 } from './instruments';
+import {
+  applyInstrumentParams,
+  createSendGain,
+  createTrackFilter,
+  clampInstrumentParams,
+  type InstrumentParams,
+} from './instrument-params';
 
 export interface AudioEngineState {
   isPlaying: boolean;
@@ -42,6 +49,11 @@ function isDrumTrack(track: Track): boolean {
 interface TrackChannel {
   gain: Tone.Gain;
   panner: Tone.Panner;
+  filter: Tone.Filter;
+  sendReverb: Tone.Gain;
+  sendDelay: Tone.Gain;
+  meter: Tone.Meter;
+  sidechain: Tone.Gain;
   mute: boolean;
   solo: boolean;
 }
@@ -61,6 +73,9 @@ export class AudioEngine {
   private metronome?: Tone.MembraneSynth;
   private metronomePart?: Tone.Part;
   private metronomeEnabled = false;
+  private masterReverb?: Tone.Reverb;
+  private masterDelay?: Tone.FeedbackDelay;
+  private masterCompressor?: Tone.Compressor;
 
   constructor(onStateChange?: (state: AudioEngineState) => void) {
     this.onStateChange = onStateChange;
@@ -83,18 +98,18 @@ export class AudioEngine {
 
       // Master effects chain: time effects -> EQ -> dynamics -> safety limiter
       const limiter = new Tone.Limiter(-0.5).toDestination();
-      const compressor = new Tone.Compressor(-20, 3.5).connect(limiter);
+      this.masterCompressor = new Tone.Compressor(-20, 3.5).connect(limiter);
       const eq = new Tone.EQ3({
         low: -2,
         mid: 1.5,
         high: -1,
         lowFrequency: 250,
         highFrequency: 4000,
-      }).connect(compressor);
-      const reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.02, wet: 0.25 }).connect(eq);
-      const delay = new Tone.FeedbackDelay('8n.', 0.28).connect(reverb);
-      const chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.35 }).connect(delay);
-      this.effects = [chorus, delay, reverb, eq, compressor, limiter];
+      }).connect(this.masterCompressor);
+      this.masterReverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.02, wet: 0.25 }).connect(eq);
+      this.masterDelay = new Tone.FeedbackDelay('8n.', 0.28).connect(this.masterReverb);
+      const chorus = new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.35 }).connect(this.masterDelay);
+      this.effects = [chorus, this.masterDelay, this.masterReverb, eq, this.masterCompressor, limiter];
 
       // Metronome
       this.metronome = new Tone.MembraneSynth({
@@ -165,11 +180,34 @@ export class AudioEngine {
     const channel: TrackChannel = {
       gain: new Tone.Gain(track.volume ?? 1),
       panner: new Tone.Panner(track.pan ?? 0),
+      filter: createTrackFilter(track.instrumentParams),
+      sendReverb: createSendGain(),
+      sendDelay: createSendGain(),
+      meter: new Tone.Meter({ smoothing: 0.1, normalRange: true }),
+      sidechain: new Tone.Gain(1),
       mute: track.mute ?? false,
       solo: track.solo ?? false,
     };
+
+    // Per-track FX send levels
+    channel.sendReverb.gain.value = track.instrumentParams.reverb;
+    channel.sendDelay.gain.value = track.instrumentParams.delay;
+
+    // Main chain: gain -> panner -> meter -> filter -> sidechain -> compressor
     channel.gain.connect(channel.panner);
+    channel.panner.connect(channel.meter);
+    channel.meter.connect(channel.filter);
+    channel.filter.connect(channel.sidechain);
+    if (this.masterCompressor) channel.sidechain.connect(this.masterCompressor);
+
+    // FX sends tap post-panner
+    channel.panner.connect(channel.sendReverb);
+    channel.panner.connect(channel.sendDelay);
+    if (this.masterReverb) channel.sendReverb.connect(this.masterReverb);
+    if (this.masterDelay) channel.sendDelay.connect(this.masterDelay);
+
     this.trackChannels.set(track.id, channel);
+    this.sidechainGains.set(track.id, channel.sidechain);
     return channel;
   }
 
@@ -207,11 +245,7 @@ export class AudioEngine {
     return getInstrumentById(id) ?? getInstrumentById(fallbackId)!;
   }
 
-  private async loadInstrumentForTrack(
-    track: Track,
-    channel: TrackChannel,
-    compressor: Tone.Compressor
-  ): Promise<PlayableInstrument | null> {
+  private async loadInstrumentForTrack(track: Track, channel: TrackChannel): Promise<PlayableInstrument | null> {
     const def = this.resolveInstrumentDefinition(track);
 
     if (def.type === 'drums') {
@@ -219,18 +253,14 @@ export class AudioEngine {
       return null;
     }
 
-    const sidechainGain = new Tone.Gain(1).connect(compressor);
-    this.sidechainGains.set(track.id, sidechainGain);
-
     if (def.type === 'custom') {
       const synth = createCustomSynth(def.id);
+      applyInstrumentParams(synth, track.instrumentParams);
       synth.connect(channel.gain);
-      channel.gain.connect(channel.panner);
-      channel.panner.connect(sidechainGain);
       return synth;
     }
 
-    // Soundfont
+    // Soundfont: macros apply to the track-level filter/sends, not the Soundfont itself.
     const context = Tone.context.rawContext as AudioContext;
     const soundfont = new Soundfont(context, {
       instrument: def.config,
@@ -239,8 +269,6 @@ export class AudioEngine {
     });
     await soundfont.load;
     (soundfont.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
-    channel.gain.connect(channel.panner);
-    channel.panner.connect(sidechainGain);
     return soundfont;
   }
 
@@ -262,6 +290,11 @@ export class AudioEngine {
     for (const channel of this.trackChannels.values()) {
       channel.gain.dispose();
       channel.panner.dispose();
+      channel.filter.dispose();
+      channel.sendReverb.dispose();
+      channel.sendDelay.dispose();
+      channel.meter.dispose();
+      channel.sidechain.dispose();
     }
     this.trackChannels.clear();
     this.drumKit?.dispose();
@@ -281,11 +314,9 @@ export class AudioEngine {
     const melodicTracks = project.tracks.filter((t) => !isDrumTrack(t));
     this.resetLoading(melodicTracks.length);
 
-    const compressor = this.effects.find((e) => e instanceof Tone.Compressor) as Tone.Compressor;
-
     for (const track of project.tracks) {
       const channel = this.trackChannels.get(track.id)!;
-      const inst = await this.loadInstrumentForTrack(track, channel, compressor);
+      const inst = await this.loadInstrumentForTrack(track, channel);
       if (inst) {
         this.instruments.set(track.id, inst);
       }
@@ -299,7 +330,6 @@ export class AudioEngine {
           const channel = this.trackChannels.get(track.id);
           if (channel) {
             this.drumKit.output.connect(channel.gain);
-            channel.gain.connect(channel.panner);
           }
         }
       }
@@ -457,6 +487,40 @@ export class AudioEngine {
     if (this.project) {
       this.scheduleMetronome(this.project);
     }
+  }
+
+  /** Update a track's live instrument macro parameters (ADSR, filter, FX sends). */
+  updateInstrumentParams(trackId: string, params: Partial<InstrumentParams>) {
+    const track = this.project?.tracks.find((t) => t.id === trackId);
+    const channel = this.trackChannels.get(trackId);
+    if (!track || !channel) return;
+
+    const next = clampInstrumentParams({ ...track.instrumentParams, ...params });
+    track.instrumentParams = next;
+
+    channel.filter.frequency.setTargetAtTime(next.cutoff, Tone.now(), 0.02);
+    channel.filter.Q.setTargetAtTime(next.resonance, Tone.now(), 0.02);
+    channel.sendReverb.gain.setTargetAtTime(next.reverb, Tone.now(), 0.02);
+    channel.sendDelay.gain.setTargetAtTime(next.delay, Tone.now(), 0.02);
+
+    const instrument = this.instruments.get(trackId);
+    if (instrument) {
+      applyInstrumentParams(instrument, next);
+    }
+  }
+
+  /** Get per-track linear level readings (0–1) for the UI meters. */
+  getMeterValues(): Record<string, number> {
+    const values: Record<string, number> = {};
+    for (const [id, channel] of this.trackChannels) {
+      try {
+        const value = channel.meter.getValue();
+        values[id] = typeof value === 'number' ? Math.max(0, Math.min(1, value)) : 0;
+      } catch {
+        values[id] = 0;
+      }
+    }
+    return values;
   }
 
   private disposeParts() {

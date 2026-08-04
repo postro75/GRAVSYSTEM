@@ -12,6 +12,28 @@ export const EffectSchema = z.object({
   parameters: z.record(z.union([z.number(), z.string(), z.boolean()])).default({}),
 });
 
+export const InstrumentParamsSchema = z.object({
+  attack: z.number().min(0).max(5).default(0.02),
+  decay: z.number().min(0).max(5).default(0.2),
+  sustain: z.number().min(0).max(1).default(0.7),
+  release: z.number().min(0).max(10).default(0.5),
+  cutoff: z.number().min(20).max(20000).default(20000),
+  resonance: z.number().min(0).max(20).default(1),
+  reverb: z.number().min(0).max(1).default(0.25),
+  delay: z.number().min(0).max(1).default(0.2),
+});
+
+export const DEFAULT_INSTRUMENT_PARAMS = {
+  attack: 0.02,
+  decay: 0.2,
+  sustain: 0.7,
+  release: 0.5,
+  cutoff: 20000,
+  resonance: 1,
+  reverb: 0.25,
+  delay: 0.2,
+};
+
 export const RegionSchema = z.object({
   id: z.string().uuid(),
   trackId: z.string().uuid(),
@@ -31,6 +53,7 @@ export const TrackSchema = z.object({
   type: z.enum(['midi', 'audio', 'group', 'return']),
   instrument: z.string().optional(),
   instrumentType: z.enum(['custom', 'soundfont', 'drums']).optional(),
+  instrumentParams: InstrumentParamsSchema.default(() => DEFAULT_INSTRUMENT_PARAMS),
   channel: z.number().int().min(1).max(128).default(1),
   regions: z.array(RegionSchema).default([]),
   volume: z.number().min(0).max(2).default(1),
@@ -68,6 +91,7 @@ export const GenerationRequestSchema = z.object({
 
 export type MidiEvent = z.infer<typeof MidiEventSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
+export type InstrumentParams = z.infer<typeof InstrumentParamsSchema>;
 export type Region = z.infer<typeof RegionSchema>;
 export type Track = z.infer<typeof TrackSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
@@ -96,6 +120,7 @@ export function createTrack(input: Partial<Track> & { name: string }): Track {
     name: input.name,
     type: input.type ?? 'midi',
     instrument: input.instrument,
+    instrumentParams: input.instrumentParams ?? DEFAULT_INSTRUMENT_PARAMS,
     channel: input.channel ?? 1,
     regions: input.regions ?? [],
     volume: input.volume ?? 1,

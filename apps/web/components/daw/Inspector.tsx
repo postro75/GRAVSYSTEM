@@ -4,6 +4,7 @@ import { Track, Region } from '@gravsystem/core';
 import { trackStyle } from '@/lib/track-styles';
 import { Hash, Clock, Music, Activity, Type, Guitar } from 'lucide-react';
 import { InstrumentPicker } from './InstrumentPicker';
+import { InstrumentMacroEditor } from './InstrumentMacroEditor';
 
 export interface InspectorProps {
   project?: {
@@ -18,6 +19,7 @@ export interface InspectorProps {
   selectedRegion?: Region | null;
   onInstrumentSelect?: (trackId: string, instrumentId: string) => void;
   onInstrumentPreview?: (trackId: string, instrumentId: string) => void;
+  onInstrumentParamsChange?: (trackId: string, params: import('@gravsystem/core').InstrumentParams) => void;
 }
 
 function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
@@ -38,6 +40,7 @@ export function Inspector({
   selectedRegion,
   onInstrumentSelect,
   onInstrumentPreview,
+  onInstrumentParamsChange,
 }: InspectorProps) {
   const style = selectedTrack ? trackStyle(selectedTrack.name) : null;
   const Icon = style?.icon;
@@ -96,6 +99,15 @@ export function Inspector({
                 onPreview={(id) => onInstrumentPreview?.(selectedTrack.id, id)}
               />
             </div>
+          </div>
+        )}
+
+        {selectedTrack && onInstrumentParamsChange && (
+          <div className="mb-4 flex h-72 flex-col">
+            <InstrumentMacroEditor
+              params={selectedTrack.instrumentParams}
+              onChange={(params) => onInstrumentParamsChange(selectedTrack.id, params)}
+            />
           </div>
         )}
 

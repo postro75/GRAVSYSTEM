@@ -22,9 +22,10 @@ export interface BottomPanelProps {
   onActiveTabChange?: (tab: BottomTab) => void;
   onRegionChange?: (region: Region) => void;
   onTrackChange: (trackId: string, updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>) => void;
-  onPreviewNote?: (trackId: string, pitch: number) => void;
+  onPreviewNote?: (trackId: string, pitch: number, velocity?: number) => void;
   onRecordNote?: (note: { pitch: number; velocity: number; start: number; duration: number }) => void;
   onPreviewChord?: (notes: number[]) => void;
+  getRecordPosition?: () => number;
 }
 
 const TABS: { id: BottomTab; label: string; icon: React.ElementType }[] = [
@@ -49,6 +50,7 @@ export function BottomPanel({
   onPreviewNote,
   onRecordNote,
   onPreviewChord,
+  getRecordPosition,
 }: BottomPanelProps) {
   const [internalTab, setInternalTab] = useState<BottomTab>('piano');
   const activeTab = controlledTab ?? internalTab;
@@ -108,8 +110,9 @@ export function BottomPanel({
         {activeTab === 'keyboard' && (
           <VirtualPiano
             selectedRegion={selectedRegion}
-            onPreview={(pitch) => {
-              if (selectedTrackId) onPreviewNote?.(selectedTrackId, pitch);
+            getRecordPosition={getRecordPosition}
+            onPreview={(pitch, velocity) => {
+              if (selectedTrackId) onPreviewNote?.(selectedTrackId, pitch, velocity);
             }}
             onRecordNote={onRecordNote}
           />

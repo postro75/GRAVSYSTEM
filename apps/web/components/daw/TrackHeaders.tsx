@@ -7,6 +7,7 @@ import { trackStyle } from '@/lib/track-styles';
 export interface TrackHeadersProps {
   tracks: Track[];
   selectedTrackId?: string | null;
+  meterLevels?: Record<string, number>;
   onTrackChange: (trackId: string, updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>) => void;
   onSelectTrack?: (trackId: string) => void;
 }
@@ -26,6 +27,7 @@ function panLabel(value: number): string {
 export function TrackHeaders({
   tracks,
   selectedTrackId,
+  meterLevels,
   onTrackChange,
   onSelectTrack,
 }: TrackHeadersProps) {
@@ -104,6 +106,22 @@ export function TrackHeaders({
                   >
                     <Headphones size={10} />
                   </button>
+
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative h-5 w-1.5 rounded bg-apple-border">
+                      <div
+                        className="absolute bottom-0 left-0 right-0 rounded bg-apple-accent transition-all"
+                        style={{
+                          height: `${Math.round((meterLevels?.[track.id] ?? 0) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <div
+                      className={`h-2 w-2 rounded-full transition ${
+                        (meterLevels?.[track.id] ?? 0) > 0.01 ? 'bg-apple-accent shadow-[0_0_6px_rgba(59,130,246,0.8)]' : 'bg-apple-border'
+                      }`}
+                    />
+                  </div>
 
                   <div className="flex flex-1 flex-col gap-0.5">
                     <input
