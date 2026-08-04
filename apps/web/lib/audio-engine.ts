@@ -1,6 +1,13 @@
 import * as Tone from 'tone';
 import { Soundfont } from 'smplr';
-import { Project, Track, MidiEvent } from '@gravsystem/core';
+import {
+  Project,
+  Track,
+  MidiEvent,
+  AutomationParam,
+  AutomationPoint,
+  AUTOMATION_RANGES,
+} from '@gravsystem/core';
 import { SynthDrumKit, SampleDrumKit } from './drum-kit';
 import {
   createCustomSynth,
@@ -76,6 +83,7 @@ export class AudioEngine {
   private masterReverb?: Tone.Reverb;
   private masterDelay?: Tone.FeedbackDelay;
   private masterCompressor?: Tone.Compressor;
+  private automationEventIds: number[] = [];
 
   constructor(onStateChange?: (state: AudioEngineState) => void) {
     this.onStateChange = onStateChange;
@@ -462,6 +470,80 @@ export class AudioEngine {
     }
 
     this.scheduleMetronome(project);
+    this.scheduleAutomation(project);
+  }
+
+  private getAutomationAudioParam(
+    trackId: string,
+    param: AutomationParam
+  ): { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void } | undefined {
+    const channel = this.trackChannels.get(trackId);
+    if (!channel) return undefined;
+    switch (param) {
+      case 'volume':
+        return channel.gain.gain as unknown as { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void };
+      case 'pan':
+        return channel.panner.pan as unknown as { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void };
+      case 'cutoff':
+        return channel.filter.frequency as unknown as { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void };
+      case 'resonance':
+        return channel.filter.Q as unknown as { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void };
+      case 'reverb':
+        return channel.sendReverb.gain as unknown as { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void };
+      case 'delay':
+        return channel.sendDelay.gain as unknown as { setValueAtTime: (value: number, time: number) => void; linearRampToValueAtTime: (value: number, endTime: number) => void; cancelScheduledValues: (time: number) => void };
+      default:
+        return undefined;
+    }
+  }
+
+  private scheduleAutomation(project: Project) {
+    // Clear previous automation events
+    this.automationEventIds.forEach((id) => Tone.Transport.clear(id));
+    this.automationEventIds = [];
+
+    const secondsPerBeat = 60 / project.bpm;
+
+    for (const track of project.tracks) {
+      if (track.automation.length === 0) continue;
+
+      const byParam = new Map<AutomationParam, AutomationPoint[]>();
+      for (const point of track.automation) {
+        const list = byParam.get(point.param) ?? [];
+        list.push(point);
+        byParam.set(point.param, list);
+      }
+
+      for (const [param, points] of byParam) {
+        const sorted = points.sort((a, b) => a.time - b.time);
+        const audioParam = this.getAutomationAudioParam(track.id, param);
+        if (!audioParam) continue;
+
+        // If first point is after beat 0, seed the static value so automation starts from the right place.
+        if (sorted[0].time > 0) {
+          const id = Tone.Transport.schedule((time) => {
+            audioParam.setValueAtTime(AUTOMATION_RANGES[param].default, time);
+          }, 0);
+          this.automationEventIds.push(id);
+        }
+
+        for (let i = 0; i < sorted.length; i++) {
+          const point = sorted[i];
+          const next = sorted[i + 1];
+          const startTime = point.time * secondsPerBeat;
+
+          const id = Tone.Transport.schedule((time) => {
+            audioParam.cancelScheduledValues(time);
+            audioParam.setValueAtTime(point.value, time);
+            if (next) {
+              const endTime = next.time * secondsPerBeat;
+              audioParam.linearRampToValueAtTime(next.value, time + (endTime - startTime));
+            }
+          }, startTime);
+          this.automationEventIds.push(id);
+        }
+      }
+    }
   }
 
   private scheduleMetronome(project: Project) {
@@ -507,6 +589,14 @@ export class AudioEngine {
     if (instrument) {
       applyInstrumentParams(instrument, next);
     }
+  }
+
+  /** Replace a track's automation data and re-schedule the ramps. */
+  updateAutomation(trackId: string, points: AutomationPoint[]) {
+    const track = this.project?.tracks.find((t) => t.id === trackId);
+    if (!track || !this.project) return;
+    track.automation = points;
+    this.scheduleAutomation(this.project);
   }
 
   /** Get per-track linear level readings (0–1) for the UI meters. */

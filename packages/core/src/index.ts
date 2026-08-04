@@ -34,6 +34,36 @@ export const DEFAULT_INSTRUMENT_PARAMS = {
   delay: 0.2,
 };
 
+export const AUTOMATION_PARAMS = [
+  'volume',
+  'pan',
+  'cutoff',
+  'resonance',
+  'reverb',
+  'delay',
+] as const;
+
+export const AutomationParamSchema = z.enum(AUTOMATION_PARAMS);
+
+export const AUTOMATION_RANGES: Record<
+  AutomationParam,
+  { min: number; max: number; default: number }
+> = {
+  volume: { min: 0, max: 2, default: 1 },
+  pan: { min: -1, max: 1, default: 0 },
+  cutoff: { min: 20, max: 20000, default: 20000 },
+  resonance: { min: 0, max: 20, default: 1 },
+  reverb: { min: 0, max: 1, default: 0.25 },
+  delay: { min: 0, max: 1, default: 0.2 },
+};
+
+export const AutomationPointSchema = z.object({
+  id: z.string().uuid().default(() => crypto.randomUUID()),
+  param: AutomationParamSchema,
+  time: z.number().nonnegative(), // beats
+  value: z.number(), // actual parameter value
+});
+
 export const RegionSchema = z.object({
   id: z.string().uuid(),
   trackId: z.string().uuid(),
@@ -61,6 +91,7 @@ export const TrackSchema = z.object({
   mute: z.boolean().default(false),
   solo: z.boolean().default(false),
   effects: z.array(EffectSchema).default([]),
+  automation: z.array(AutomationPointSchema).default([]),
 });
 
 export const ProjectSchema = z.object({
@@ -92,6 +123,8 @@ export const GenerationRequestSchema = z.object({
 export type MidiEvent = z.infer<typeof MidiEventSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
 export type InstrumentParams = z.infer<typeof InstrumentParamsSchema>;
+export type AutomationParam = z.infer<typeof AutomationParamSchema>;
+export type AutomationPoint = z.infer<typeof AutomationPointSchema>;
 export type Region = z.infer<typeof RegionSchema>;
 export type Track = z.infer<typeof TrackSchema>;
 export type Project = z.infer<typeof ProjectSchema>;
@@ -128,6 +161,7 @@ export function createTrack(input: Partial<Track> & { name: string }): Track {
     mute: input.mute ?? false,
     solo: input.solo ?? false,
     effects: input.effects ?? [],
+    automation: input.automation ?? [],
   });
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { InstrumentParams, DEFAULT_INSTRUMENT_PARAMS } from '@gravsystem/core';
+import type { InstrumentDefinition } from '@/lib/instruments';
 import { formatParamValue } from '@/lib/instrument-params';
 import { SlidersHorizontal } from 'lucide-react';
 
@@ -13,22 +14,69 @@ interface SliderDef {
   step: number;
 }
 
-const ENVELOPE_SLIDERS: SliderDef[] = [
+const BASE_SLIDERS: SliderDef[] = [
   { key: 'attack', label: 'Attack', min: 0, max: 2000, step: 5 },
   { key: 'decay', label: 'Decay', min: 0, max: 2000, step: 5 },
   { key: 'sustain', label: 'Sustain', min: 0, max: 100, step: 1 },
   { key: 'release', label: 'Release', min: 0, max: 5000, step: 10 },
-];
-
-const TONE_SLIDERS: SliderDef[] = [
   { key: 'cutoff', label: 'Filter Cutoff', min: 20, max: 20000, step: 10 },
   { key: 'resonance', label: 'Resonance', min: 0, max: 20, step: 0.1 },
   { key: 'reverb', label: 'Reverb Send', min: 0, max: 100, step: 1 },
   { key: 'delay', label: 'Delay Send', min: 0, max: 100, step: 1 },
 ];
 
+const CATEGORY_LABELS: Partial<
+  Record<InstrumentDefinition['category'], Partial<Record<keyof InstrumentParams, string>>>
+> = {
+  bass: {
+    attack: 'Punch',
+    cutoff: 'Growl',
+    resonance: 'Bite',
+    reverb: 'Space',
+    delay: 'Width',
+  },
+  lead: {
+    cutoff: 'Brightness',
+    resonance: 'Bite',
+    reverb: 'Space',
+    delay: 'Echo',
+  },
+  pad: {
+    attack: 'Swell',
+    cutoff: 'Darkness',
+    resonance: 'Air',
+    reverb: 'Hall',
+    delay: 'Width',
+  },
+  arp: {
+    decay: 'Pluck',
+    delay: 'Echo',
+  },
+  chords: {
+    cutoff: 'Body',
+    resonance: 'Sparkle',
+    reverb: 'Hall',
+    delay: 'Width',
+  },
+  drums: {
+    attack: 'Punch',
+    decay: 'Decay',
+    reverb: 'Room',
+    delay: 'Echo',
+  },
+};
+
+function getSlidersForCategory(category?: InstrumentDefinition['category']): SliderDef[] {
+  const labels = category ? CATEGORY_LABELS[category] : undefined;
+  return BASE_SLIDERS.map((def) => ({
+    ...def,
+    label: labels?.[def.key] ?? def.label,
+  }));
+}
+
 export interface InstrumentMacroEditorProps {
   params?: InstrumentParams;
+  category?: InstrumentDefinition['category'];
   onChange?: (params: InstrumentParams) => void;
 }
 
@@ -44,9 +92,10 @@ function fromSliderValue(key: keyof InstrumentParams, value: number): number {
   return value;
 }
 
-export function InstrumentMacroEditor({ params, onChange }: InstrumentMacroEditorProps) {
+export function InstrumentMacroEditor({ params, category, onChange }: InstrumentMacroEditorProps) {
   const current = params ?? DEFAULT_INSTRUMENT_PARAMS;
   const [local, setLocal] = useState(current);
+  const sliders = getSlidersForCategory(category);
 
   useEffect(() => {
     setLocal(current);
@@ -90,6 +139,11 @@ export function InstrumentMacroEditor({ params, onChange }: InstrumentMacroEdito
         <div className="flex items-center gap-2 text-xs font-semibold text-apple-text">
           <SlidersHorizontal size={12} />
           Macros
+          {category && (
+            <span className="rounded bg-apple-surface-raised px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-apple-muted">
+              {category}
+            </span>
+          )}
         </div>
         <button
           onClick={reset}
@@ -103,13 +157,17 @@ export function InstrumentMacroEditor({ params, onChange }: InstrumentMacroEdito
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
             Envelope
           </div>
-          <div className="grid grid-cols-2 gap-3">{ENVELOPE_SLIDERS.map(renderSlider)}</div>
+          <div className="grid grid-cols-2 gap-3">
+            {sliders.filter((s) => ['attack', 'decay', 'sustain', 'release'].includes(s.key)).map(renderSlider)}
+          </div>
         </div>
         <div>
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
             Tone & FX
           </div>
-          <div className="grid grid-cols-2 gap-3">{TONE_SLIDERS.map(renderSlider)}</div>
+          <div className="grid grid-cols-2 gap-3">
+            {sliders.filter((s) => ['cutoff', 'resonance', 'reverb', 'delay'].includes(s.key)).map(renderSlider)}
+          </div>
         </div>
       </div>
     </div>

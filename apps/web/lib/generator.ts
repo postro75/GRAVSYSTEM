@@ -32,6 +32,7 @@ export function generateProject(request: GenerationRequest): Project {
       instrument: instrumentId,
       instrumentType: instrumentDef?.type ?? 'custom',
       instrumentParams: DEFAULT_INSTRUMENT_PARAMS,
+      automation: [],
       channel: tracks.length + 1,
     });
 

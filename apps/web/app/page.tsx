@@ -10,7 +10,7 @@ import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
 import { getInstrumentById } from '@/lib/instruments';
-import { Project, ProjectSchema, Region, Track, InstrumentParams } from '@gravsystem/core';
+import { Project, ProjectSchema, Region, Track, InstrumentParams, AutomationPoint } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
 import { downloadRpp } from '@/lib/rpp-export';
@@ -378,6 +378,20 @@ export default function Home() {
     playerRef.current?.previewNote(trackId, 60, 100, 0.4);
   };
 
+  const handleAutomationChange = (trackId: string, points: AutomationPoint[]) => {
+    if (!dawProject) return;
+    playerRef.current?.updateAutomation(trackId, points);
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.id === trackId ? { ...track, automation: points } : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+  };
+
   const handlePreviewChord = (notes: number[]) => {
     if (!selectedTrackId) return;
     notes.forEach((note, i) => {
@@ -497,6 +511,7 @@ export default function Home() {
             tracks={dawProject?.tracks ?? []}
             selectedRegion={selectedRegion}
             selectedTrackId={selectedTrackId}
+            bars={dawProject?.bars ?? 16}
             bpm={dawProject?.bpm ?? 120}
             keyRoot={dawProject?.key ?? 'C'}
             scale={dawProject?.scale ?? 'minor'}
@@ -509,6 +524,7 @@ export default function Home() {
             }
             onRecordNote={handleRecordNote}
             onPreviewChord={handlePreviewChord}
+            onAutomationChange={handleAutomationChange}
             getRecordPosition={() => playerRef.current?.getPositionBeats() ?? 0}
           />
         </div>

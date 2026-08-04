@@ -2,6 +2,7 @@
 
 import { Track, Region } from '@gravsystem/core';
 import { trackStyle } from '@/lib/track-styles';
+import { getInstrumentById } from '@/lib/instruments';
 import { Hash, Clock, Music, Activity, Type, Guitar } from 'lucide-react';
 import { InstrumentPicker } from './InstrumentPicker';
 import { InstrumentMacroEditor } from './InstrumentMacroEditor';
@@ -44,6 +45,9 @@ export function Inspector({
 }: InspectorProps) {
   const style = selectedTrack ? trackStyle(selectedTrack.name) : null;
   const Icon = style?.icon;
+  const category = selectedTrack?.instrument
+    ? getInstrumentById(selectedTrack.instrument)?.category
+    : undefined;
 
   return (
     <div className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-l border-apple-border bg-apple-surface">
@@ -106,6 +110,7 @@ export function Inspector({
           <div className="mb-4 flex h-72 flex-col">
             <InstrumentMacroEditor
               params={selectedTrack.instrumentParams}
+              category={category}
               onChange={(params) => onInstrumentParamsChange(selectedTrack.id, params)}
             />
           </div>

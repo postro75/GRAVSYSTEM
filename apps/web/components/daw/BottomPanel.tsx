@@ -7,14 +7,16 @@ import { Mixer } from './Mixer';
 import { ChordPad } from './ChordPad';
 import { StepSequencer } from './StepSequencer';
 import { VirtualPiano } from './VirtualPiano';
-import { Piano, SlidersHorizontal, Music, Grid3X3, Keyboard } from 'lucide-react';
+import { AutomationEditor } from './AutomationEditor';
+import { Piano, SlidersHorizontal, Music, Grid3X3, Keyboard, Activity } from 'lucide-react';
 
-export type BottomTab = 'piano' | 'mixer' | 'chords' | 'sequencer' | 'keyboard';
+export type BottomTab = 'piano' | 'mixer' | 'chords' | 'sequencer' | 'keyboard' | 'automation';
 
 export interface BottomPanelProps {
   tracks: Track[];
   selectedRegion?: Region | null;
   selectedTrackId?: string | null;
+  bars?: number;
   bpm?: number;
   keyRoot?: string;
   scale?: 'major' | 'minor';
@@ -25,6 +27,7 @@ export interface BottomPanelProps {
   onPreviewNote?: (trackId: string, pitch: number, velocity?: number) => void;
   onRecordNote?: (note: { pitch: number; velocity: number; start: number; duration: number }) => void;
   onPreviewChord?: (notes: number[]) => void;
+  onAutomationChange?: (trackId: string, points: import('@gravsystem/core').AutomationPoint[]) => void;
   getRecordPosition?: () => number;
 }
 
@@ -33,6 +36,7 @@ const TABS: { id: BottomTab; label: string; icon: React.ElementType }[] = [
   { id: 'chords', label: 'Chords', icon: Music },
   { id: 'sequencer', label: 'Steps', icon: Grid3X3 },
   { id: 'keyboard', label: 'Keys', icon: Keyboard },
+  { id: 'automation', label: 'Automation', icon: Activity },
   { id: 'mixer', label: 'Mixer', icon: SlidersHorizontal },
 ];
 
@@ -40,6 +44,7 @@ export function BottomPanel({
   tracks,
   selectedRegion,
   selectedTrackId,
+  bars = 16,
   bpm = 120,
   keyRoot = 'C',
   scale = 'minor',
@@ -50,6 +55,7 @@ export function BottomPanel({
   onPreviewNote,
   onRecordNote,
   onPreviewChord,
+  onAutomationChange,
   getRecordPosition,
 }: BottomPanelProps) {
   const [internalTab, setInternalTab] = useState<BottomTab>('piano');
@@ -115,6 +121,14 @@ export function BottomPanel({
               if (selectedTrackId) onPreviewNote?.(selectedTrackId, pitch, velocity);
             }}
             onRecordNote={onRecordNote}
+          />
+        )}
+
+        {activeTab === 'automation' && (
+          <AutomationEditor
+            track={tracks.find((t) => t.id === selectedTrackId) ?? null}
+            bars={bars}
+            onChange={onAutomationChange}
           />
         )}
 
