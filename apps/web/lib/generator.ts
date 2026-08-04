@@ -1,6 +1,7 @@
 import { Project, Track, createProject, createTrack, createRegion, GenerationRequest } from '@gravsystem/core';
 import { buildConfig } from './music-theory';
 import { generateMidiEvents, eventsToMidiEvents } from './pattern-generator';
+import { inferInstrumentForTrack, getInstrumentById } from './instruments';
 
 export function generateProject(request: GenerationRequest): Project {
   const config = buildConfig(request.description, {
@@ -15,10 +16,13 @@ export function generateProject(request: GenerationRequest): Project {
   const tracks: Track[] = [];
 
   for (const [trackName, events] of Object.entries(midiEvents)) {
+    const instrumentId = inferInstrumentForTrack(trackName, config.style);
+    const instrumentDef = getInstrumentById(instrumentId);
     const track = createTrack({
       name: trackName,
       type: 'midi',
-      instrument: instrumentForTrack(trackName),
+      instrument: instrumentId,
+      instrumentType: instrumentDef?.type ?? 'custom',
       channel: tracks.length + 1,
     });
 
@@ -51,16 +55,4 @@ export function generateProject(request: GenerationRequest): Project {
     bars: config.bars,
     tracks,
   });
-}
-
-function instrumentForTrack(trackName: string): string {
-  const name = trackName.toLowerCase();
-  if (name.includes('drum') || name.includes('kick') || name.includes('hat')) return 'drums';
-  if (name.includes('bass')) return 'bass';
-  if (name.includes('arpeggio')) return 'arpeggio';
-  if (name.includes('pad') || name.includes('string')) return 'pad';
-  if (name.includes('chords') || name.includes('stab')) return 'chords';
-  if (name.includes('lead')) return 'lead';
-  if (name.includes('drone')) return 'drone';
-  return 'synth';
 }

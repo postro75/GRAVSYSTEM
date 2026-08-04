@@ -1,7 +1,13 @@
 import * as Tone from 'tone';
 import { Soundfont } from 'smplr';
-import { Project, Track } from '@gravsystem/core';
-import { SynthDrumKit } from './drum-kit';
+import { Project, Track, MidiEvent } from '@gravsystem/core';
+import { SynthDrumKit, SampleDrumKit } from './drum-kit';
+import {
+  createCustomSynth,
+  getInstrumentById,
+  inferInstrumentForTrack,
+  type InstrumentDefinition,
+} from './instruments';
 
 export interface AudioEngineState {
   isPlaying: boolean;
@@ -10,153 +16,27 @@ export interface AudioEngineState {
   error: string | null;
 }
 
-const GM_INSTRUMENTS: Record<string, string> = {
-  bass: 'synth_bass_1',
-  pad: 'pad_2_warm',
-  string: 'synth_strings_1',
-  drone: 'choir_aahs',
-  arpeggio: 'marimba',
-  chords: 'electric_piano_1',
-  stab: 'synth_brass_1',
-  lead: 'lead_2_sawtooth',
-  fx: 'fx_8_scifi',
-};
+export type PlayableInstrument =
+  | Tone.PolySynth
+  | Tone.MonoSynth
+  | Tone.DuoSynth
+  | Tone.FMSynth
+  | Tone.AMSynth
+  | Soundfont;
 
-function instrumentForTrack(trackName: string): string {
-  const name = trackName.toLowerCase();
-  for (const [key, value] of Object.entries(GM_INSTRUMENTS)) {
-    if (name.includes(key)) return value;
-  }
-  return 'synth_strings_1';
+function isDrumTrackName(name: string): boolean {
+  const lowered = name.toLowerCase();
+  return (
+    lowered.includes('drum') ||
+    lowered.includes('kick') ||
+    lowered.includes('snare') ||
+    lowered.includes('hat') ||
+    lowered.includes('clap')
+  );
 }
 
-function createSynthForTrack(trackName: string, style: string): Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth {
-  const name = trackName.toLowerCase();
-  const s = style.toLowerCase();
-  const isJarre = s === 'jarre' || s === 'ambient';
-  const isSynthwave = s === 'synthwave';
-  const isDance = s === 'dance' || s === 'electro' || s === 'house' || s === 'edm';
-
-  if (name.includes('bass')) {
-    if (isJarre) {
-      return new Tone.MonoSynth({
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.02, decay: 0.35, sustain: 0.5, release: 0.6 },
-        filterEnvelope: { attack: 0.05, decay: 0.4, sustain: 0.35, release: 0.6, baseFrequency: 60, octaves: 3, exponent: 2 },
-        filter: { Q: 1.5, type: 'lowpass', rolloff: -24 },
-      });
-    }
-    if (isSynthwave) {
-      return new Tone.MonoSynth({
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.005, decay: 0.25, sustain: 0.7, release: 0.5 },
-        filterEnvelope: { attack: 0.005, decay: 0.2, sustain: 0.5, release: 0.4, baseFrequency: 100, octaves: 2.5, exponent: 2 },
-        filter: { Q: 2.5, type: 'lowpass', rolloff: -24 },
-      });
-    }
-    return new Tone.MonoSynth({
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.005, decay: 0.18, sustain: 0.65, release: 0.35 },
-      filterEnvelope: { attack: 0.005, decay: 0.15, sustain: 0.4, release: 0.3, baseFrequency: 90, octaves: 2.5, exponent: 2 },
-      filter: { Q: 2.2, type: 'lowpass', rolloff: -24 },
-    });
-  }
-
-  if (name.includes('lead')) {
-    if (isJarre) {
-      return new Tone.DuoSynth({
-        vibratoAmount: 0.15,
-        vibratoRate: 4,
-        harmonicity: 1.25,
-        voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.08, decay: 0.2, sustain: 0.75, release: 0.8 }, filterEnvelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 0.8, baseFrequency: 350, octaves: 2.5 } },
-        voice1: { oscillator: { type: 'triangle' }, envelope: { attack: 0.08, decay: 0.2, sustain: 0.75, release: 0.8 }, filterEnvelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 0.8, baseFrequency: 350, octaves: 2.5 } },
-      });
-    }
-    if (isSynthwave) {
-      return new Tone.DuoSynth({
-        vibratoAmount: 0.05,
-        vibratoRate: 6,
-        harmonicity: 1.5,
-        voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5 }, filterEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 600, octaves: 2 } },
-        voice1: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5 }, filterEnvelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5, baseFrequency: 600, octaves: 2 } },
-      });
-    }
-    return new Tone.DuoSynth({
-      vibratoAmount: 0.08,
-      vibratoRate: 5,
-      harmonicity: 1.5,
-      voice0: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45 }, filterEnvelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45, baseFrequency: 450, octaves: 2 } },
-      voice1: { oscillator: { type: 'square' }, envelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45 }, filterEnvelope: { attack: 0.03, decay: 0.1, sustain: 0.75, release: 0.45, baseFrequency: 450, octaves: 2 } },
-    });
-  }
-
-  if (name.includes('pad') || name.includes('string') || name.includes('drone')) {
-    if (isJarre) {
-      return new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'sawtooth' },
-        envelope: { attack: 0.6, decay: 0.3, sustain: 0.85, release: 2.0 },
-      });
-    }
-    return new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.3, decay: 0.2, sustain: 0.8, release: 1.2 },
-    });
-  }
-
-  if (name.includes('arpeggio')) {
-    if (isJarre) {
-      return new Tone.FMSynth({
-        harmonicity: 2,
-        modulationIndex: 6,
-        oscillator: { type: 'sine' },
-        envelope: { attack: 0.02, decay: 0.2, sustain: 0.4, release: 0.8 },
-        modulation: { type: 'triangle' },
-        modulationEnvelope: { attack: 0.02, decay: 0.2, sustain: 0.3, release: 0.5 },
-      });
-    }
-    return new Tone.FMSynth({
-      harmonicity: 3,
-      modulationIndex: 10,
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.5 },
-      modulation: { type: 'square' },
-      modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.3 },
-    });
-  }
-
-  if (name.includes('chords') || name.includes('stab')) {
-    if (isDance) {
-      return new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: 'square' },
-        envelope: { attack: 0.005, decay: 0.12, sustain: 0.35, release: 0.25 },
-      });
-    }
-    return new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'square' },
-      envelope: { attack: 0.02, decay: 0.15, sustain: 0.4, release: 0.4 },
-    });
-  }
-
-  // Fallback
-  return new Tone.PolySynth(Tone.Synth, {
-    oscillator: { type: 'triangle' },
-    envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.5 },
-  });
-}
-
-export type VoiceType = 'custom' | 'soundfont';
-
-function voiceTypeForTrack(trackName: string): VoiceType {
-  const name = trackName.toLowerCase();
-  if (name.includes('bass') || name.includes('lead') || name.includes('pad') || name.includes('string') || name.includes('drone') || name.includes('arpeggio') || name.includes('chords') || name.includes('stab')) {
-    return 'custom';
-  }
-  return 'soundfont';
-}
-
-function isDrumTrack(trackName: string): boolean {
-  const name = trackName.toLowerCase();
-  return name.includes('drum') || name.includes('kick') || name.includes('hat') || name.includes('clap');
+function isDrumTrack(track: Track): boolean {
+  return track.instrumentType === 'drums' || isDrumTrackName(track.name);
 }
 
 interface TrackChannel {
@@ -171,8 +51,8 @@ export class AudioEngine {
   private onStateChange?: (state: AudioEngineState) => void;
   private isStarted = false;
   private parts: Tone.Part[] = [];
-  private instruments: Map<string, Tone.PolySynth | Tone.MonoSynth | Tone.DuoSynth | Tone.FMSynth | Soundfont> = new Map();
-  private drumKit?: SynthDrumKit;
+  private instruments: Map<string, PlayableInstrument> = new Map();
+  private drumKit?: SynthDrumKit | SampleDrumKit;
   private effects: Tone.ToneAudioNode[] = [];
   private sidechainGains: Map<string, Tone.Gain> = new Map();
   private trackChannels: Map<string, TrackChannel> = new Map();
@@ -224,9 +104,6 @@ export class AudioEngine {
         envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
         volume: -12,
       }).connect(limiter);
-
-      // Synthesized drum kit — no external sample dependencies
-      this.drumKit = new SynthDrumKit();
 
       this.emit({ isReady: true });
     } catch (err) {
@@ -296,10 +173,6 @@ export class AudioEngine {
     return channel;
   }
 
-  private getDestinationForDrums() {
-    return this.effects[3]; // EQ
-  }
-
   private applySoloState() {
     const anySolo = Array.from(this.trackChannels.values()).some((ch) => ch.solo);
     for (const channel of this.trackChannels.values()) {
@@ -328,9 +201,50 @@ export class AudioEngine {
     }
   }
 
-  private async loadInstruments(project: Project) {
-    const context = Tone.context.rawContext as AudioContext;
+  private resolveInstrumentDefinition(track: Track): InstrumentDefinition {
+    const fallbackId = inferInstrumentForTrack(track.name, this.project?.style ?? 'dance');
+    const id = track.instrument || fallbackId;
+    return getInstrumentById(id) ?? getInstrumentById(fallbackId)!;
+  }
 
+  private async loadInstrumentForTrack(
+    track: Track,
+    channel: TrackChannel,
+    compressor: Tone.Compressor
+  ): Promise<PlayableInstrument | null> {
+    const def = this.resolveInstrumentDefinition(track);
+
+    if (def.type === 'drums') {
+      // Drum kit is created once per project load above.
+      return null;
+    }
+
+    const sidechainGain = new Tone.Gain(1).connect(compressor);
+    this.sidechainGains.set(track.id, sidechainGain);
+
+    if (def.type === 'custom') {
+      const synth = createCustomSynth(def.id);
+      synth.connect(channel.gain);
+      channel.gain.connect(channel.panner);
+      channel.panner.connect(sidechainGain);
+      return synth;
+    }
+
+    // Soundfont
+    const context = Tone.context.rawContext as AudioContext;
+    const soundfont = new Soundfont(context, {
+      instrument: def.config,
+      kit: 'FluidR3_GM',
+      volume: 100,
+    });
+    await soundfont.load;
+    (soundfont.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
+    channel.gain.connect(channel.panner);
+    channel.panner.connect(sidechainGain);
+    return soundfont;
+  }
+
+  private async loadInstruments(project: Project) {
     // Dispose old instruments and channels
     for (const inst of this.instruments.values()) {
       if ('output' in inst && inst.output) {
@@ -350,65 +264,108 @@ export class AudioEngine {
       channel.panner.dispose();
     }
     this.trackChannels.clear();
-
-    const melodicTracks = project.tracks.filter((t) => !isDrumTrack(t.name));
-    this.resetLoading(melodicTracks.length);
-
-    const compressor = this.effects.find((e) => e instanceof Tone.Compressor) as Tone.Compressor;
+    this.drumKit?.dispose();
+    this.drumKit = undefined;
 
     for (const track of project.tracks) {
       this.createTrackChannel(track);
     }
 
-    // Route synthesized drum kit through each drum track channel
-    for (const track of project.tracks) {
-      if (isDrumTrack(track.name)) {
-        const channel = this.trackChannels.get(track.id);
-        if (channel && this.drumKit) {
-          this.drumKit.output.connect(channel.gain);
-          channel.gain.connect(channel.panner);
-        }
-      }
+    // Pre-create the shared drum kit if any drum track exists.
+    const drumTrack = project.tracks.find((t) => isDrumTrack(t));
+    if (drumTrack) {
+      const drumDef = this.resolveInstrumentDefinition(drumTrack);
+      this.drumKit = drumDef.id === 'sample-drums' ? new SampleDrumKit() : new SynthDrumKit();
     }
 
-    for (const track of melodicTracks) {
-      const channel = this.trackChannels.get(track.id);
-      const sidechainGain = new Tone.Gain(1).connect(compressor);
-      this.sidechainGains.set(track.id, sidechainGain);
+    const melodicTracks = project.tracks.filter((t) => !isDrumTrack(t));
+    this.resetLoading(melodicTracks.length);
 
-      const voiceType = voiceTypeForTrack(track.name);
+    const compressor = this.effects.find((e) => e instanceof Tone.Compressor) as Tone.Compressor;
 
-      if (voiceType === 'custom') {
-        const synth = createSynthForTrack(track.name, project.style);
-        synth.connect(channel?.gain ?? sidechainGain);
-        this.instruments.set(track.id, synth);
-      } else {
-        const instrumentName = instrumentForTrack(track.name);
-        const soundfont = new Soundfont(context, {
-          instrument: instrumentName,
-          kit: 'FluidR3_GM',
-          volume: 100,
-        });
-
-        await soundfont.load;
-
-        if (channel) {
-          (soundfont.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
-        } else {
-          (soundfont.output as unknown as AudioNode).connect(sidechainGain as unknown as AudioNode);
-        }
-        this.instruments.set(track.id, soundfont);
+    for (const track of project.tracks) {
+      const channel = this.trackChannels.get(track.id)!;
+      const inst = await this.loadInstrumentForTrack(track, channel, compressor);
+      if (inst) {
+        this.instruments.set(track.id, inst);
       }
-
-      if (channel) {
-        channel.gain.connect(channel.panner);
-        channel.panner.connect(sidechainGain);
-      }
-
       this.markLoaded();
     }
 
+    // Connect drum kit output to every drum track channel
+    if (this.drumKit) {
+      for (const track of project.tracks) {
+        if (isDrumTrack(track)) {
+          const channel = this.trackChannels.get(track.id);
+          if (channel) {
+            this.drumKit.output.connect(channel.gain);
+            channel.gain.connect(channel.panner);
+          }
+        }
+      }
+    }
+
     this.applySoloState();
+  }
+
+  /** Swap a track's instrument live and re-schedule playback. */
+  async setInstrument(trackId: string, instrumentId: string) {
+    if (!this.project) return;
+    const track = this.project.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+
+    track.instrument = instrumentId;
+    track.instrumentType = getInstrumentById(instrumentId)?.type ?? 'custom';
+
+    // Rebuild instruments and reschedule — simplest way to keep routing correct.
+    this.disposeParts();
+    await this.loadInstruments(this.project);
+    this.scheduleProject(this.project);
+  }
+
+  /** Preview a single note using the selected track's current instrument. */
+  previewNote(trackId: string, pitch: number, velocity = 100, duration = 0.25) {
+    if (!this.isStarted) return;
+    const track = this.project?.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+
+    const vel = Math.max(0, Math.min(1, velocity / 127));
+    const dur = Math.max(0.05, duration);
+
+    if (isDrumTrack(track)) {
+      this.drumKit?.trigger(pitch, dur, Tone.now(), vel);
+      return;
+    }
+
+    const instrument = this.instruments.get(trackId);
+    if (!instrument) return;
+
+    if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
+      instrument.triggerAttackRelease(pitch, dur, Tone.now(), vel);
+    } else {
+      (instrument as Soundfont).start({
+        note: pitch,
+        time: Tone.now(),
+        duration: dur,
+        velocity: Math.round(vel * 127),
+      });
+    }
+  }
+
+  /** Append a note to the selected region in real time (used by virtual piano recording). */
+  recordNote(regionId: string, note: MidiEvent) {
+    if (!this.project) return;
+    const track = this.project.tracks.find((t) => t.regions.some((r) => r.id === regionId));
+    if (!track) return;
+    const region = track.regions.find((r) => r.id === regionId);
+    if (!region) return;
+
+    region.midiEvents.push(note);
+    region.duration = Math.max(region.duration, note.start + note.duration);
+
+    // Re-schedule so the new note is audible immediately.
+    this.disposeParts();
+    this.scheduleProject(this.project);
   }
 
   private scheduleProject(project: Project) {
@@ -429,7 +386,7 @@ export class AudioEngine {
         }))
       );
 
-      if (isDrumTrack(track.name)) {
+      if (isDrumTrack(track)) {
         if (notes.length === 0) continue;
 
         // Schedule kick separately for sidechain trigger
@@ -459,10 +416,8 @@ export class AudioEngine {
         const part = new Tone.Part<ScheduledNote>((time, value) => {
           const vel = Math.max(0, Math.min(1, value.velocity));
           if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-            // Tone.js synths
             instrument.triggerAttackRelease(value.note, value.duration, time, vel);
           } else {
-            // smplr Soundfont
             (instrument as Soundfont).start({
               note: value.note,
               time,
@@ -476,7 +431,6 @@ export class AudioEngine {
       }
     }
 
-    // Metronome
     this.scheduleMetronome(project);
   }
 
@@ -529,6 +483,10 @@ export class AudioEngine {
 
   getPositionSeconds(): number {
     return Tone.Transport.seconds;
+  }
+
+  getPositionBeats(): number {
+    return (Tone.Transport.seconds / 60) * (this.project?.bpm ?? 120);
   }
 
   dispose() {

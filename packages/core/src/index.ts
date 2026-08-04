@@ -30,6 +30,7 @@ export const TrackSchema = z.object({
   name: z.string(),
   type: z.enum(['midi', 'audio', 'group', 'return']),
   instrument: z.string().optional(),
+  instrumentType: z.enum(['custom', 'soundfont', 'drums']).optional(),
   channel: z.number().int().min(1).max(128).default(1),
   regions: z.array(RegionSchema).default([]),
   volume: z.number().min(0).max(2).default(1),

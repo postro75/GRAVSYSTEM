@@ -113,3 +113,63 @@ export class SynthDrumKit {
     this.output.dispose();
   }
 }
+
+export class SampleDrumKit {
+  readonly output: Tone.Gain;
+  readonly kick: Tone.Sampler;
+  readonly snare: Tone.Sampler;
+  readonly clap: Tone.Sampler;
+  readonly hihat: Tone.Sampler;
+
+  constructor() {
+    this.output = new Tone.Gain(1);
+    const baseUrl = '/samples/';
+    const options = { attack: 0, release: 0.1 };
+
+    this.kick = new Tone.Sampler({ C1: `${baseUrl}kick.wav` }, options).connect(this.output);
+    this.kick.volume.value = -2;
+
+    this.snare = new Tone.Sampler({ D1: `${baseUrl}snare.wav` }, options).connect(this.output);
+    this.snare.volume.value = -6;
+
+    this.clap = new Tone.Sampler({ A1: `${baseUrl}clap.wav` }, options).connect(this.output);
+    this.clap.volume.value = -5;
+
+    this.hihat = new Tone.Sampler({ 'F#1': `${baseUrl}hihat.wav` }, options).connect(this.output);
+    this.hihat.volume.value = -12;
+  }
+
+  trigger(pitch: number, duration: number, time: number, velocity: number) {
+    const sample = drumSampleName(pitch);
+    if (!sample) return;
+    const vel = Math.max(0, Math.min(1, velocity));
+    const noteName =
+      sample === 'kick' ? 'C1' :
+      sample === 'snare' ? 'D1' :
+      sample === 'clap' ? 'A1' :
+      'F#1';
+
+    switch (sample) {
+      case 'kick':
+        this.kick.triggerAttackRelease(noteName, duration, time, vel);
+        break;
+      case 'snare':
+        this.snare.triggerAttackRelease(noteName, duration, time, vel);
+        break;
+      case 'clap':
+        this.clap.triggerAttackRelease(noteName, duration, time, vel);
+        break;
+      case 'hihatClosed':
+        this.hihat.triggerAttackRelease(noteName, duration, time, vel * 0.8);
+        break;
+    }
+  }
+
+  dispose() {
+    this.kick.dispose();
+    this.snare.dispose();
+    this.clap.dispose();
+    this.hihat.dispose();
+    this.output.dispose();
+  }
+}

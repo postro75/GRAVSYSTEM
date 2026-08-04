@@ -2,7 +2,8 @@
 
 import { Track, Region } from '@gravsystem/core';
 import { trackStyle } from '@/lib/track-styles';
-import { Hash, Clock, Music, Activity, Type } from 'lucide-react';
+import { Hash, Clock, Music, Activity, Type, Guitar } from 'lucide-react';
+import { InstrumentPicker } from './InstrumentPicker';
 
 export interface InspectorProps {
   project?: {
@@ -15,6 +16,8 @@ export interface InspectorProps {
   } | null;
   selectedTrack?: Track | null;
   selectedRegion?: Region | null;
+  onInstrumentSelect?: (trackId: string, instrumentId: string) => void;
+  onInstrumentPreview?: (trackId: string, instrumentId: string) => void;
 }
 
 function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
@@ -29,12 +32,18 @@ function InfoRow({ label, value, icon: Icon }: { label: string; value: React.Rea
   );
 }
 
-export function Inspector({ project, selectedTrack, selectedRegion }: InspectorProps) {
+export function Inspector({
+  project,
+  selectedTrack,
+  selectedRegion,
+  onInstrumentSelect,
+  onInstrumentPreview,
+}: InspectorProps) {
   const style = selectedTrack ? trackStyle(selectedTrack.name) : null;
   const Icon = style?.icon;
 
   return (
-    <div className="flex h-full w-60 shrink-0 flex-col overflow-hidden border-l border-apple-border bg-apple-surface">
+    <div className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-l border-apple-border bg-apple-surface">
       <div className="flex h-8 shrink-0 items-center border-b border-apple-border bg-apple-surface-raised px-3 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
         Inspector
       </div>
@@ -71,6 +80,22 @@ export function Inspector({ project, selectedTrack, selectedRegion }: InspectorP
             <InfoRow label="Volume" value={`${Math.round((selectedTrack.volume ?? 1) * 100)}%`} />
             <InfoRow label="Pan" value={selectedTrack.pan ?? 0} />
             <InfoRow label="Regions" value={selectedTrack.regions.length} />
+          </div>
+        )}
+
+        {selectedTrack && onInstrumentSelect && (
+          <div className="mb-4 flex h-64 flex-col rounded-apple-sm border border-apple-border bg-apple-bg">
+            <div className="flex h-8 items-center gap-2 border-b border-apple-border px-3 text-xs font-semibold text-apple-text">
+              <Guitar size={12} />
+              Instrument
+            </div>
+            <div className="min-h-0 flex-1">
+              <InstrumentPicker
+                selectedInstrumentId={selectedTrack.instrument}
+                onSelect={(id) => onInstrumentSelect(selectedTrack.id, id)}
+                onPreview={(id) => onInstrumentPreview?.(selectedTrack.id, id)}
+              />
+            </div>
           </div>
         )}
 

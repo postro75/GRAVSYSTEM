@@ -32,6 +32,7 @@ const CHORD_INTERVALS: Record<string, number[]> = {
   maj7: [0, 4, 7, 11],
   '7': [0, 4, 7, 10],
   m7: [0, 3, 7, 10],
+  'm7b5': [0, 3, 6, 10],
   sus4: [0, 5, 7],
   dim: [0, 3, 6],
   aug: [0, 4, 8],
@@ -68,6 +69,55 @@ export function scaleNotes(key: string, scale: Scale, octave = 4): number[] {
   const intervals = SCALE_INTERVALS[scale] ?? SCALE_INTERVALS.minor;
   const baseMidi = (octave + 1) * 12 + root;
   return intervals.map((interval) => baseMidi + interval);
+}
+
+const DIATONIC_CHORD_TYPES: Record<Scale, string[]> = {
+  major: ['', 'm', 'm', '', '', 'm', 'dim'],
+  minor: ['m', 'dim', '', 'm', 'm', '', ''],
+};
+
+const DIATONIC_CHORD_EXTENSIONS: Record<Scale, string[]> = {
+  major: ['maj7', 'm7', 'm7', 'maj7', '7', 'm7', 'm7b5'],
+  minor: ['m7', 'm7b5', 'maj7', 'm7', 'm7', 'maj7', '7'],
+};
+
+export interface DiatonicChord {
+  degree: number;
+  roman: string;
+  name: string;
+  notes: number[];
+}
+
+export function diatonicChords(key: string, scale: Scale, octave = 4): DiatonicChord[] {
+  const root = KEY_INDEX[key] ?? 0;
+  const intervals = SCALE_INTERVALS[scale] ?? SCALE_INTERVALS.minor;
+  const baseMidi = (octave + 1) * 12 + root;
+  const types = DIATONIC_CHORD_TYPES[scale];
+  const extensions = DIATONIC_CHORD_EXTENSIONS[scale];
+  const romanMajor = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+  const romanMinor = ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII'];
+  const roman = scale === 'major' ? romanMajor : romanMinor;
+
+  return intervals.map((interval, degree) => {
+    const chordIntervals = CHORD_INTERVALS[types[degree]];
+    const extensionIntervals = CHORD_INTERVALS[extensions[degree]];
+    const notes = chordIntervals.map((ci) => baseMidi + interval + ci);
+    const extensionNotes = extensionIntervals.map((ei) => baseMidi + interval + ei);
+    const name = getNoteName((root + interval) % 12) + types[degree];
+    return {
+      degree,
+      roman: roman[degree],
+      name,
+      notes,
+      // Provide both triad and 7th notes for richer voicings
+      seventhNotes: extensionNotes,
+    } as DiatonicChord & { seventhNotes: number[] };
+  });
+}
+
+function getNoteName(midiNote: number): string {
+  const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  return names[midiNote % 12];
 }
 
 const STYLE_PROGRESSIONS: Record<string, Record<string, string[]>> = {

@@ -4,62 +4,116 @@ import { useState } from 'react';
 import { Track, Region } from '@gravsystem/core';
 import { PianoRoll } from './PianoRoll';
 import { Mixer } from './Mixer';
-import { Piano, SlidersHorizontal } from 'lucide-react';
+import { ChordPad } from './ChordPad';
+import { StepSequencer } from './StepSequencer';
+import { VirtualPiano } from './VirtualPiano';
+import { Piano, SlidersHorizontal, Music, Grid3X3, Keyboard } from 'lucide-react';
+
+export type BottomTab = 'piano' | 'mixer' | 'chords' | 'sequencer' | 'keyboard';
 
 export interface BottomPanelProps {
   tracks: Track[];
   selectedRegion?: Region | null;
+  selectedTrackId?: string | null;
   bpm?: number;
+  keyRoot?: string;
+  scale?: 'major' | 'minor';
+  activeTab?: BottomTab;
+  onActiveTabChange?: (tab: BottomTab) => void;
   onRegionChange?: (region: Region) => void;
   onTrackChange: (trackId: string, updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>) => void;
+  onPreviewNote?: (trackId: string, pitch: number) => void;
+  onRecordNote?: (note: { pitch: number; velocity: number; start: number; duration: number }) => void;
+  onPreviewChord?: (notes: number[]) => void;
 }
+
+const TABS: { id: BottomTab; label: string; icon: React.ElementType }[] = [
+  { id: 'piano', label: 'Piano Roll', icon: Piano },
+  { id: 'chords', label: 'Chords', icon: Music },
+  { id: 'sequencer', label: 'Steps', icon: Grid3X3 },
+  { id: 'keyboard', label: 'Keys', icon: Keyboard },
+  { id: 'mixer', label: 'Mixer', icon: SlidersHorizontal },
+];
 
 export function BottomPanel({
   tracks,
   selectedRegion,
+  selectedTrackId,
   bpm = 120,
+  keyRoot = 'C',
+  scale = 'minor',
+  activeTab: controlledTab,
+  onActiveTabChange,
   onRegionChange,
   onTrackChange,
+  onPreviewNote,
+  onRecordNote,
+  onPreviewChord,
 }: BottomPanelProps) {
-  const [activeTab, setActiveTab] = useState<'piano' | 'mixer'>('piano');
+  const [internalTab, setInternalTab] = useState<BottomTab>('piano');
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = (tab: BottomTab) => {
+    setInternalTab(tab);
+    onActiveTabChange?.(tab);
+  };
 
   return (
-    <div className="flex h-72 shrink-0 flex-col border-t border-apple-border bg-apple-surface">
+    <div className="flex h-80 shrink-0 flex-col border-t border-apple-border bg-apple-surface">
       {/* Tabs */}
       <div className="flex h-9 shrink-0 items-center border-b border-apple-border bg-apple-surface-raised">
-        <button
-          onClick={() => setActiveTab('piano')}
-          className={`flex h-full items-center gap-2 border-b-2 px-4 text-xs font-medium transition ${
-            activeTab === 'piano'
-              ? 'border-apple-accent text-apple-accent'
-              : 'border-transparent text-apple-muted hover:text-apple-text'
-          }`}
-        >
-          <Piano size={14} />
-          Piano Roll
-        </button>
-        <button
-          onClick={() => setActiveTab('mixer')}
-          className={`flex h-full items-center gap-2 border-b-2 px-4 text-xs font-medium transition ${
-            activeTab === 'mixer'
-              ? 'border-apple-accent text-apple-accent'
-              : 'border-transparent text-apple-muted hover:text-apple-text'
-          }`}
-        >
-          <SlidersHorizontal size={14} />
-          Mixer
-        </button>
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex h-full items-center gap-2 border-b-2 px-4 text-xs font-medium transition ${
+                activeTab === tab.id
+                  ? 'border-apple-accent text-apple-accent'
+                  : 'border-transparent text-apple-muted hover:text-apple-text'
+              }`}
+            >
+              <Icon size={14} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
       <div className="min-h-0 flex-1">
-        {activeTab === 'piano' && selectedRegion ? (
+        {activeTab === 'piano' && selectedRegion && (
           <PianoRoll region={selectedRegion} bpm={bpm} onChange={onRegionChange} />
-        ) : activeTab === 'piano' ? (
+        )}
+        {activeTab === 'piano' && !selectedRegion && (
           <div className="flex h-full items-center justify-center text-xs text-apple-muted">
-            Select a region on the timeline to edit notes in the Piano Roll.
+            Select a region on the timeline to edit notes.
           </div>
-        ) : null}
+        )}
+
+        {activeTab === 'chords' && (
+          <ChordPad
+            keyRoot={keyRoot}
+            scale={scale}
+            selectedRegion={selectedRegion}
+            onChange={onRegionChange}
+            onPreview={onPreviewChord}
+          />
+        )}
+
+        {activeTab === 'sequencer' && (
+          <StepSequencer selectedRegion={selectedRegion} onChange={onRegionChange} />
+        )}
+
+        {activeTab === 'keyboard' && (
+          <VirtualPiano
+            selectedRegion={selectedRegion}
+            onPreview={(pitch) => {
+              if (selectedTrackId) onPreviewNote?.(selectedTrackId, pitch);
+            }}
+            onRecordNote={onRecordNote}
+          />
+        )}
 
         {activeTab === 'mixer' && <Mixer tracks={tracks} onChange={onTrackChange} />}
       </div>

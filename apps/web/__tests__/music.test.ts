@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseChord,
   scaleNotes,
+  diatonicChords,
   defaultProgression,
   styleBpm,
   styleBars,
@@ -26,6 +27,18 @@ describe('music theory', () => {
   it('builds scale notes', () => {
     const dMinor = scaleNotes('D', 'minor', 4);
     expect(dMinor).toEqual([62, 64, 65, 67, 69, 70, 72]);
+  });
+
+  it('builds diatonic chords', () => {
+    const cMajor = diatonicChords('C', 'major', 4);
+    expect(cMajor).toHaveLength(7);
+    expect(cMajor[0].name).toBe('C');
+    expect(cMajor[0].notes).toEqual([60, 64, 67]);
+    expect(cMajor[3].name).toBe('F');
+
+    const aMinor = diatonicChords('A', 'minor', 4);
+    expect(aMinor[0].name).toBe('Am');
+    expect(aMinor[0].notes).toEqual([69, 72, 76]);
   });
 
   it('detects BPM from description', () => {

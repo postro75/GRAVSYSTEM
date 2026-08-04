@@ -6,9 +6,10 @@ import { Toolbar } from '@/components/daw/Toolbar';
 import { TrackHeaders } from '@/components/daw/TrackHeaders';
 import { Timeline } from '@/components/daw/Timeline';
 import { Inspector } from '@/components/daw/Inspector';
-import { BottomPanel } from '@/components/daw/BottomPanel';
+import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
+import { getInstrumentById } from '@/lib/instruments';
 import { Project, ProjectSchema, Region, Track } from '@gravsystem/core';
 import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
@@ -52,6 +53,7 @@ export default function Home() {
   const [isRendering, setIsRendering] = useState(false);
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('piano');
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -330,6 +332,51 @@ export default function Home() {
   const handleRegionClick = (track: Track, region: Region) => {
     setSelectedRegion(region);
     setSelectedTrackId(track.id);
+    const isDrum = /drum|kick|snare|hat|clap/i.test(track.name) || track.instrumentType === 'drums';
+    setActiveBottomTab(isDrum ? 'sequencer' : 'piano');
+  };
+
+  const handleInstrumentSelect = async (trackId: string, instrumentId: string) => {
+    if (!dawProject) return;
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.id === trackId
+          ? {
+              ...track,
+              instrument: instrumentId,
+              instrumentType: getInstrumentById(instrumentId)?.type ?? 'custom',
+              updatedAt: new Date().toISOString(),
+            }
+          : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+    await playerRef.current?.setInstrument(trackId, instrumentId);
+  };
+
+  const handleInstrumentPreview = (trackId: string, _instrumentId: string) => {
+    // Preview C3 on the selected track using the new instrument.
+    playerRef.current?.previewNote(trackId, 60, 100, 0.4);
+  };
+
+  const handlePreviewChord = (notes: number[]) => {
+    if (!selectedTrackId) return;
+    notes.forEach((note, i) => {
+      setTimeout(() => playerRef.current?.previewNote(selectedTrackId, note, 100, 0.5), i * 20);
+    });
+  };
+
+  const handleRecordNote = (note: { pitch: number; velocity: number; start: number; duration: number }) => {
+    if (!selectedRegion) return;
+    const updatedRegion: Region = {
+      ...selectedRegion,
+      midiEvents: [...selectedRegion.midiEvents, note],
+      duration: Math.max(selectedRegion.duration, note.start + note.duration),
+    };
+    handleRegionChange(updatedRegion);
   };
 
   const selectedTrack = dawProject?.tracks.find((t) => t.id === selectedTrackId) ?? null;
@@ -432,9 +479,17 @@ export default function Home() {
           <BottomPanel
             tracks={dawProject?.tracks ?? []}
             selectedRegion={selectedRegion}
+            selectedTrackId={selectedTrackId}
             bpm={dawProject?.bpm ?? 120}
+            keyRoot={dawProject?.key ?? 'C'}
+            scale={dawProject?.scale ?? 'minor'}
+            activeTab={activeBottomTab}
+            onActiveTabChange={setActiveBottomTab}
             onRegionChange={handleRegionChange}
             onTrackChange={handleTrackChange}
+            onPreviewNote={(trackId, pitch) => playerRef.current?.previewNote(trackId, pitch, 100, 0.4)}
+            onRecordNote={handleRecordNote}
+            onPreviewChord={handlePreviewChord}
           />
         </div>
 
@@ -453,6 +508,8 @@ export default function Home() {
           }
           selectedTrack={selectedTrack}
           selectedRegion={selectedRegion}
+          onInstrumentSelect={handleInstrumentSelect}
+          onInstrumentPreview={handleInstrumentPreview}
         />
       </main>
 
