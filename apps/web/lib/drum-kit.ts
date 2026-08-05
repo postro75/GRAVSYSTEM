@@ -20,8 +20,9 @@ function drumSampleName(pitch: number): DrumSample | null {
     case DRUM_NOTES.clap:
       return 'clap';
     case DRUM_NOTES.hihatClosed:
-    case DRUM_NOTES.hihatOpen:
       return 'hihatClosed';
+    case DRUM_NOTES.hihatOpen:
+      return 'hihatOpen';
     case DRUM_NOTES.crash:
       return 'crash';
     default:
@@ -29,50 +30,92 @@ function drumSampleName(pitch: number): DrumSample | null {
   }
 }
 
+/**
+ * A richer synthetic drum kit that avoids the "laser" hihat sound.
+ * Kick has sub weight + click, snare mixes body and noise, hats use
+ * band-passed noise, clap uses a multi-burst envelope.
+ */
 export class SynthDrumKit {
   readonly output: Tone.Gain;
-  readonly kick: Tone.MembraneSynth;
-  readonly snare: Tone.NoiseSynth;
+  readonly kick: {
+    body: Tone.MembraneSynth;
+    click: Tone.MembraneSynth;
+  };
+  readonly snare: {
+    body: Tone.MembraneSynth;
+    wires: Tone.NoiseSynth;
+  };
+  readonly hihatClosed: Tone.NoiseSynth;
+  readonly hihatOpen: Tone.NoiseSynth;
   readonly clap: Tone.NoiseSynth;
-  readonly hihat: Tone.MetalSynth;
   readonly crash: Tone.NoiseSynth;
 
   constructor() {
     this.output = new Tone.Gain(1);
 
-    this.kick = new Tone.MembraneSynth({
-      pitchDecay: 0.05,
-      octaves: 5,
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.4 },
-      volume: -2,
-    }).connect(this.output);
+    // Kick: deep sine body + short click for attack.
+    this.kick = {
+      body: new Tone.MembraneSynth({
+        pitchDecay: 0.06,
+        octaves: 6,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.55, sustain: 0, release: 0.35 },
+        volume: -1,
+      }).connect(this.output),
+      click: new Tone.MembraneSynth({
+        pitchDecay: 0.01,
+        octaves: 2,
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 },
+        volume: -14,
+      }).connect(this.output),
+    };
 
-    this.snare = new Tone.NoiseSynth({
+    // Snare: tuned body + noisy wires.
+    this.snare = {
+      body: new Tone.MembraneSynth({
+        pitchDecay: 0.03,
+        octaves: 3,
+        oscillator: { type: 'sine' },
+        envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.08 },
+        volume: -6,
+      }).connect(this.output),
+      wires: new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.1 },
+        volume: -8,
+      }).connect(this.output),
+    };
+
+    // Hihats: band-passed white noise, not MetalSynth.
+    const hatFilter = new Tone.Filter(9000, 'bandpass', -24);
+    const hatVolume = new Tone.Volume(-12).connect(this.output);
+    hatFilter.connect(hatVolume);
+
+    this.hihatClosed = new Tone.NoiseSynth({
       noise: { type: 'white' },
-      envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
-      volume: -4,
-    }).connect(this.output);
+      envelope: { attack: 0.001, decay: 0.045, sustain: 0, release: 0.03 },
+      volume: -2,
+    }).connect(hatFilter);
 
+    this.hihatOpen = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.001, decay: 0.22, sustain: 0, release: 0.15 },
+      volume: -2,
+    }).connect(hatFilter);
+
+    // Clap: four quick bursts.
     this.clap = new Tone.NoiseSynth({
       noise: { type: 'pink' },
-      envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.08 },
+      envelope: { attack: 0.001, decay: 0.14, sustain: 0, release: 0.08 },
       volume: -5,
     }).connect(this.output);
 
-    this.hihat = new Tone.MetalSynth({
-      envelope: { attack: 0.001, decay: 0.05, release: 0.03 },
-      harmonicity: 5.1,
-      modulationIndex: 32,
-      resonance: 6000,
-      octaves: 1.5,
-      volume: -10,
-    }).connect(this.output);
-
+    // Crash: pink noise with long decay.
     this.crash = new Tone.NoiseSynth({
-      noise: { type: 'white' },
+      noise: { type: 'pink' },
       envelope: { attack: 0.01, decay: 1.2, sustain: 0, release: 0.8 },
-      volume: -8,
+      volume: -7,
     }).connect(this.output);
   }
 
@@ -84,20 +127,28 @@ export class SynthDrumKit {
 
     switch (sample) {
       case 'kick':
-        this.kick.triggerAttackRelease('C1', duration, time, vel);
+        this.kick.body.triggerAttackRelease('C1', duration, time, vel);
+        this.kick.click.triggerAttackRelease('G3', 0.03, time, vel * 0.6);
         break;
       case 'snare':
-        this.snare.triggerAttackRelease(duration, time, vel);
+        this.snare.body.triggerAttackRelease('D2', duration, time, vel * 0.5);
+        this.snare.wires.triggerAttackRelease(duration, time, vel * 0.85);
         break;
-      case 'clap':
-        this.clap.triggerAttackRelease(duration, time, vel);
-        break;
-      case 'hihatClosed': {
-        // Closed hats get a tighter envelope; open hats a longer one.
-        const dur = pitch === DRUM_NOTES.hihatOpen ? duration * 4 : duration;
-        this.hihat.triggerAttackRelease(dur, time, vel * 0.8);
+      case 'clap': {
+        // Multi-burst clap: four closely spaced noise bursts.
+        const gap = 0.012;
+        for (let i = 0; i < 4; i++) {
+          const burstVel = vel * (1 - i * 0.18);
+          this.clap.triggerAttackRelease(0.04, time + i * gap, burstVel);
+        }
         break;
       }
+      case 'hihatClosed':
+        this.hihatClosed.triggerAttackRelease(0.05, time, vel * 0.8);
+        break;
+      case 'hihatOpen':
+        this.hihatOpen.triggerAttackRelease(0.25, time, vel * 0.8);
+        break;
       case 'crash':
         this.crash.triggerAttackRelease(duration * 4, time, vel);
         break;
@@ -105,15 +156,22 @@ export class SynthDrumKit {
   }
 
   dispose() {
-    this.kick.dispose();
-    this.snare.dispose();
+    this.kick.body.dispose();
+    this.kick.click.dispose();
+    this.snare.body.dispose();
+    this.snare.wires.dispose();
+    this.hihatClosed.dispose();
+    this.hihatOpen.dispose();
     this.clap.dispose();
-    this.hihat.dispose();
     this.crash.dispose();
     this.output.dispose();
   }
 }
 
+/**
+ * Sample-based drum kit with velocity-sensitive playback.
+ * Expects WAV samples at /samples/{kick,snare,clap,hihat}.wav.
+ */
 export class SampleDrumKit {
   readonly output: Tone.Gain;
   readonly kick: Tone.Sampler;
@@ -160,6 +218,7 @@ export class SampleDrumKit {
         this.clap.triggerAttackRelease(noteName, duration, time, vel);
         break;
       case 'hihatClosed':
+      case 'hihatOpen':
         this.hihat.triggerAttackRelease(noteName, duration, time, vel * 0.8);
         break;
     }

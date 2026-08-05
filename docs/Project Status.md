@@ -1,84 +1,57 @@
 # GRAVSYSTEM — Project Status
 
-## Co działa teraz
+## Current state
 
-- UI z 5 presetami ze zdjęciami i ikonami.
-- Algorytmiczna generacja MIDI/REAPER z opisu naturalnego języka.
-- **Browser preview przez Tone.js** — odtwarzanie wygenerowanego projektu bezpośrednio w przeglądarce.
-- **Pro render przez Stable Audio API** — przycisk generujący gotowy audio WAV w stylu.
-- Eksport: `.mid` + `.rpp` (REAPER z osadzonym MIDI).
+GRAVSYSTEM is a browser-based AI DAW. The latest Phase 15 shipped a professional sound and UX overhaul. The app is live on Vercel, all tests pass, and the codebase is ready for the next wave of features (WAM plugins, side-chain, backend render).
 
-## Ostatnie zmiany
+## What works now
 
-- Dodano `tone` jako zależność.
-- Nowy silnik: `lib/tone-engine.ts`.
-- Nowy komponent: `components/TonePreviewButton.tsx`.
-- Nowy endpoint: `app/api/render-stable/route.ts`.
-- Zaktualizowany `components/ProjectCard.tsx` — preview i pro-render obok siebie.
-- Utworzono dokumentację strategiczną:
-  - `docs/Benchmark and Gap Analysis.md`
-  - `docs/Product Specification.md`
-  - `docs/Technical Architecture.md`
-  - `docs/Roadmap.md`
-- **Phase 0 — Foundation ukończona:**
-  - Monorepo `apps/web`, `apps/api`, `packages/core`.
-  - GitHub Actions CI, Docker Compose (Postgres + Redis).
-  - DAW shell: prompt bar, transport, timeline.
-  - FastAPI scaffold z shared Zod/Pydantic schemas.
-  - Vercel production deploy: https://vercel-app-pink-xi.vercel.app
-  - `docs/Phase 0 ROI Critique.md`
-- **Phase 1 — Text-to-MIDI Core ukończona:**
-  - FastAPI `/api/generate` zwraca Project JSON z MIDI events.
-  - Pythonowa logika generowania: `music_theory.py` + `pattern_generator.py`.
-  - Frontend renderuje wygenerowane regiony na timeline.
-  - Sample-based preview (kick, snare, hihat, clap).
-  - Next.js API fallback dla Vercel preview.
-  - ESLint zero błędów/zero warningów.
-  - `docs/Phase 1 ROI Critique.md`
-- **Phase 2 — Browser DAW UI ukończona:**
-  - Piano-roll editor: dodawanie, zaznaczanie, przesuwanie, usuwanie nut.
-  - Kliknięcie regionu na timeline otwiera piano roll.
-  - Transport Play/Pause/Stop steruje `Tone.Transport`.
-  - Playback cursor na timeline.
-  - Zmiany w piano rollu aktualizują projekt i przeładowują audio.
-  - `docs/Backend Consolidation Plan.md` — konsolidacja backendu na FastAPI + Render.
-  - `docs/Phase 2 ROI Critique.md`
-- **Phase 3 — Professional sound + MIDI export ukończona:**
-  - Nowy silnik audio: SoundFont (smplr) + sample perkusji + efekty + sidechain.
-  - Endpoint `/api/export/midi` i przycisk "Export MIDI" w UI.
-  - Undo/redo w piano roll.
-  - Pliki deploymentowe: `apps/api/Dockerfile`, `apps/api/Procfile`, `render.yaml`.
-  - `docs/Phase 3 ROI Critique.md`.
-  - **Bloker:** FastAPI nie wdrożony na Render/AWS z powodu braku credentials.
-- **Phase 3b — Local-first desktop MVP pivot:**
-  - MIDI export przeniesiony do przeglądarki (`@tonejs/midi`), działa offline.
-  - Persistencja projektów w `localStorage` z auto-save i ostatnim projektem.
-  - Desktop wrapper Electron (`apps/web/electron/` + `npm run electron:dev`).
-  - `docs/Phase 3b ROI Critique.md`.
+- **Text-to-project generation** from Polish/English descriptions.
+- **5 style presets** with matched photography and artist references (Jarre, Kavinsky, Guetta, Ambient, Techno).
+- **Browser playback** via Tone.js — drums, bass, pads, leads, arps, FX with per-track mixer and insert effects.
+- **DAW editing** — piano roll, step sequencer, automation lanes, track volume/pan/mute/solo, instrument picker.
+- **Exports** — `.mid`, `.rpp` (REAPER), `.wav` offline render, and JSON project import/export.
+- **Project persistence** in `localStorage` with project manager.
+- **46 vitest tests** green + lint/type-check clean.
 
-## Wymagane zmienne środowiskowe
+## Latest phase
+
+**Phase 15 — Professional Sound & UX Overhaul** (done)
+
+- Rewrote synthetic drum kit (weighted kick, snare body+wires, band-passed hats, multi-burst clap).
+- Added style-specific synths (Jarre bass/pad/brass, Kavinsky bass/lead/arp, Guetta lead/chords).
+- Style-aware master FX chain (reverb/delay/compression tuned per style).
+- Richer chord progressions with `add9/maj7/sus4` and slash-chord support.
+- Less repetitive bass/arp patterns with phrase variation.
+- Cleaner instrument picker (category icons, style filters, descriptions).
+- Macro slider tooltips and improved step-sequencer beat markers.
+- WAM host research stub for browser plugin integration.
+
+See `docs/Phase 15 ROI Critique.md` for full details.
+
+## Environment variables
 
 ```bash
-# Opcjonalne — tylko jeśli chcesz używać Pro Render (Stable Audio)
+# Optional — only needed for Pro Render (Stable Audio) endpoint
 STABLE_AUDIO_API_KEY=sk-...
 ```
 
-Bez klucza endpoint zwraca błąd 503 z informacją, że klucz nie jest skonfigurowany.
+Without the key the endpoint returns 503 with a clear message.
 
-## Testy
+## Test & build
 
 ```bash
-npm test       # 11/11 testów
-npm run build  # czysty build
+npm run ci        # lint + type-check + test
+npm run build     # Next.js production build
 ```
 
 ## Deploy
 
 ```bash
-vercel deploy --prod --yes
+vercel --prod --yes
 ```
 
-## Linki
+## Links
 
 - Repo: https://github.com/postro75/GRAVSYSTEM
-- Produkcja Vercel: https://vercel-app-pink-xi.vercel.app
+- Production: https://gravsystem.vercel.app

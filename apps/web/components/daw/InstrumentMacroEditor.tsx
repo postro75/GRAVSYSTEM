@@ -9,20 +9,21 @@ import { SlidersHorizontal } from 'lucide-react';
 interface SliderDef {
   key: keyof InstrumentParams;
   label: string;
+  tip: string;
   min: number;
   max: number;
   step: number;
 }
 
 const BASE_SLIDERS: SliderDef[] = [
-  { key: 'attack', label: 'Attack', min: 0, max: 2000, step: 5 },
-  { key: 'decay', label: 'Decay', min: 0, max: 2000, step: 5 },
-  { key: 'sustain', label: 'Sustain', min: 0, max: 100, step: 1 },
-  { key: 'release', label: 'Release', min: 0, max: 5000, step: 10 },
-  { key: 'cutoff', label: 'Filter Cutoff', min: 20, max: 20000, step: 10 },
-  { key: 'resonance', label: 'Resonance', min: 0, max: 20, step: 0.1 },
-  { key: 'reverb', label: 'Reverb Send', min: 0, max: 100, step: 1 },
-  { key: 'delay', label: 'Delay Send', min: 0, max: 100, step: 1 },
+  { key: 'attack', label: 'Attack', tip: 'How quickly the sound starts.', min: 0, max: 2000, step: 5 },
+  { key: 'decay', label: 'Decay', tip: 'How quickly the sound falls to the sustain level.', min: 0, max: 2000, step: 5 },
+  { key: 'sustain', label: 'Sustain', tip: 'Level held while a note is held.', min: 0, max: 100, step: 1 },
+  { key: 'release', label: 'Release', tip: 'How quickly the sound fades after the note ends.', min: 0, max: 5000, step: 10 },
+  { key: 'cutoff', label: 'Filter Cutoff', tip: 'Brightness/darkness of the low-pass filter.', min: 20, max: 20000, step: 10 },
+  { key: 'resonance', label: 'Resonance', tip: 'Emphasis around the filter cutoff frequency.', min: 0, max: 20, step: 0.1 },
+  { key: 'reverb', label: 'Reverb Send', tip: 'Amount of hall/space effect.', min: 0, max: 100, step: 1 },
+  { key: 'delay', label: 'Delay Send', tip: 'Amount of echo/repeat effect.', min: 0, max: 100, step: 1 },
 ];
 
 const CATEGORY_LABELS: Partial<
@@ -116,8 +117,8 @@ export function InstrumentMacroEditor({ params, category, onChange }: Instrument
     const value = toSliderValue(def.key, local[def.key]);
     return (
       <div key={def.key} className="flex flex-col gap-1">
-        <div className="flex items-center justify-between text-[10px] text-apple-muted">
-          <span>{def.label}</span>
+        <div className="flex items-center justify-between text-[10px] text-apple-muted" title={def.tip}>
+          <span className="cursor-help underline decoration-dotted underline-offset-2">{def.label}</span>
           <span className="tabular-nums">{formatParamValue(def.key, local[def.key])}</span>
         </div>
         <input

@@ -468,16 +468,18 @@ export default function Home() {
         <div className="flex items-start gap-3 border-b border-apple-border bg-apple-surface-raised px-4 py-2 text-sm text-apple-text">
           <Info size={16} className="mt-0.5 shrink-0 text-apple-accent" />
           <div className="flex-1 space-y-1">
-            <p className="font-medium">Getting started</p>
-            <p className="text-xs text-apple-muted">
-              1. Type a style like &quot;Jean-Michel Jarre ambient space&quot; or &quot;Kavinsky synthwave&quot; and click Generate.
-            </p>
-            <p className="text-xs text-apple-muted">
-              2. Press Play. If you see <strong>Enable Audio</strong> above, click it first — browsers require a click to start sound.
-            </p>
-            <p className="text-xs text-apple-muted">
-              3. Click any region to edit notes in the Piano Roll, or switch to the Mixer tab to adjust volume and pan.
-            </p>
+            <p className="font-medium">Getting started — 3 steps</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-apple-muted">
+              <span>
+                <strong className="text-apple-text">1.</strong> Type a style and click Generate.
+              </span>
+              <span>
+                <strong className="text-apple-text">2.</strong> Click Enable Audio, then Play.
+              </span>
+              <span>
+                <strong className="text-apple-text">3.</strong> Click a region to edit, or use the Inspector on the right to change instruments.
+              </span>
+            </div>
           </div>
           <button
             onClick={() => setShowHints(false)}

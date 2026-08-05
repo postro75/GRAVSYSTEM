@@ -170,6 +170,7 @@ export class AudioEngine {
     this.project = project;
 
     try {
+      this.configureMasterChain(project.style);
       await this.loadInstruments(project);
       this.scheduleProject(project);
       Tone.Transport.bpm.value = project.bpm;
@@ -183,6 +184,28 @@ export class AudioEngine {
         error: err instanceof Error ? err.message : 'Project load failed',
         loading: false,
       });
+    }
+  }
+
+  /** Reconfigure the master FX chain to match the musical style. */
+  private configureMasterChain(style: string) {
+    const s = style.toLowerCase();
+    const ambientLike = s === 'jarre' || s === 'ambient';
+    const edmLike = s === 'dance' || s === 'electro' || s === 'house';
+
+    if (this.masterReverb) {
+      this.masterReverb.decay = ambientLike ? 3.8 : edmLike ? 1.6 : 2.2;
+      this.masterReverb.preDelay = ambientLike ? 0.04 : 0.02;
+      this.masterReverb.wet.value = ambientLike ? 0.38 : edmLike ? 0.18 : 0.25;
+    }
+    if (this.masterDelay) {
+      this.masterDelay.delayTime.value = ambientLike ? '8n.' : '8n';
+      this.masterDelay.feedback.value = ambientLike ? 0.38 : edmLike ? 0.22 : 0.28;
+      this.masterDelay.wet.value = ambientLike ? 0.35 : edmLike ? 0.12 : 0.2;
+    }
+    if (this.masterCompressor) {
+      this.masterCompressor.threshold.value = edmLike ? -22 : -18;
+      this.masterCompressor.ratio.value = edmLike ? 5 : 3;
     }
   }
 

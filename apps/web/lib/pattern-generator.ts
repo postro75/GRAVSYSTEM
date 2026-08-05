@@ -133,7 +133,7 @@ export function generateDrumPattern(
         add(step, DRUM_NOTES.kick, (baseVel + accent) * intensity * fillIntensity, 0.6);
       }
       if (patternType === 'four_on_floor' && !kickOnly) {
-        if (isOffbeat && rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, (70 + rng() * 20) * intensity * fillIntensity, 0.3);
+        if (isOffbeat && rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, (52 + rng() * 14) * intensity * fillIntensity, 0.3);
         if (isBackbeat && rng() < playProbability) add(step, DRUM_NOTES.clap, (100 + rng() * 10) * intensity * fillIntensity, 0.5);
         if (fillAllowed && isFill && step > 10 && step % 2 === 0) {
           add(step, DRUM_NOTES.snare, (90 + rng() * 30) * intensity * fillIntensity, 0.4);
@@ -141,48 +141,48 @@ export function generateDrumPattern(
       }
     } else if (patternType === 'techno_hats' && !kickOnly) {
       if (rng() < playProbability) {
-        const vel = step % 2 === 0 ? 60 + rng() * 15 : 45 + rng() * 15;
+        const vel = step % 2 === 0 ? 48 + rng() * 12 : 34 + rng() * 12;
         add(step, DRUM_NOTES.hihatClosed, vel * intensity * fillIntensity, 0.2);
       }
-      if (isOffbeat && rng() < playProbability) add(step, DRUM_NOTES.hihatOpen, (75 + rng() * 15) * intensity * fillIntensity, 0.3);
+      if (isOffbeat && rng() < playProbability) add(step, DRUM_NOTES.hihatOpen, (58 + rng() * 12) * intensity * fillIntensity, 0.3);
     } else if (patternType === 'techno_drive' && !kickOnly) {
       if (isKickStep) add(step, DRUM_NOTES.kick, 120 * intensity * fillIntensity, 0.5);
-      if (rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, (step % 2 === 0 ? 65 : 50) * intensity * fillIntensity, 0.2);
+      if (rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, (step % 2 === 0 ? 50 : 36) * intensity * fillIntensity, 0.2);
       if (isBackbeat && rng() < playProbability) add(step, DRUM_NOTES.snare, (105 + rng() * 15) * intensity * fillIntensity, 0.4);
     } else if (patternType === 'jarre_drums') {
-      // Oxygène-style: sparse kick, backbeat snare, open hats on the offbeat.
+      // Oxygène-style: sparse kick, backbeat snare, very soft closed hats.
       if (step % 8 === 0) add(step, DRUM_NOTES.kick, 95 * intensity, 1.0);
       if (step % 8 === 4) add(step, DRUM_NOTES.snare, 80 * intensity, 0.6);
-      if (step % 4 === 2) add(step, DRUM_NOTES.hihatOpen, 55 * intensity, 0.8);
+      if (step % 4 === 2) add(step, DRUM_NOTES.hihatClosed, 38 * intensity, 0.25);
       if (step === 14) add(step, DRUM_NOTES.snare, 70 * intensity, 0.4);
     } else if (patternType === 'synthwave_drive') {
       // Four-on-the-floor with gated snare and 16th hats.
       if (isKickStep && !kickOnly) add(step, DRUM_NOTES.kick, 110 * intensity, 0.55);
       if (isBackbeat && rng() < playProbability) add(step, DRUM_NOTES.snare, 105 * intensity, 0.7);
-      if (step % 2 === 0 && rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, 60 * intensity + rng() * 10, 0.2);
-      if (isOffbeat && rng() < playProbability) add(step, DRUM_NOTES.hihatOpen, 70 * intensity, 0.3);
+      if (step % 2 === 0 && rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, 46 * intensity + rng() * 8, 0.2);
+      if (isOffbeat && rng() < playProbability) add(step, DRUM_NOTES.hihatOpen, 56 * intensity, 0.3);
     } else if (patternType === 'dance_guetta') {
       // Driving EDM: four-on-floor, clap on 2/4, 16th hats, fills every 4 bars.
       if (isKickStep && !kickOnly) add(step, DRUM_NOTES.kick, 120 * intensity, 0.5);
       if (isBackbeat && rng() < playProbability) add(step, DRUM_NOTES.clap, 110 * intensity, 0.45);
-      if (rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, 55 * intensity + rng() * 15, 0.15);
+      if (rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, 44 * intensity + rng() * 12, 0.15);
       if (fillAllowed && isFill && step > 10 && step % 2 === 0) {
         add(step, DRUM_NOTES.snare, 95 * intensity + rng() * 20, 0.35);
       }
     } else if (patternType === 'electronic_sparse') {
       if (step % 8 === 0) add(step, DRUM_NOTES.kick, 90 * intensity, 0.8);
       if (step % 8 === 4) add(step, DRUM_NOTES.snare, 75 * intensity, 0.5);
-      if (step % 8 === 6) add(step, DRUM_NOTES.hihatOpen, 55 * intensity, 0.6);
+      if (step % 8 === 6) add(step, DRUM_NOTES.hihatClosed, 38 * intensity, 0.35);
     } else if (patternType === 'ambient_textures') {
       if (step === 0) add(step, DRUM_NOTES.kick, 50 * intensity, 4.0);
-      if (step % 16 === 8) add(step, DRUM_NOTES.hihatOpen, 35 * intensity, 2.0);
+      if (step % 16 === 8) add(step, DRUM_NOTES.hihatClosed, 26 * intensity, 1.2);
     } else if (patternType === 'hihat_16ths' && !kickOnly) {
       if (isKickStep) add(step, DRUM_NOTES.kick, 110 * intensity, 0.5);
       if (isBackbeat && rng() < playProbability) add(step, DRUM_NOTES.snare, 100 * intensity, 0.4);
-      if (rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, 60 * intensity + rng() * 10, 0.2);
+      if (rng() < playProbability) add(step, DRUM_NOTES.hihatClosed, 48 * intensity + rng() * 8, 0.2);
     } else {
       if (isKickStep && !kickOnly) add(step, DRUM_NOTES.kick, 100 * intensity, 0.5);
-      if (isOffbeat && !kickOnly) add(step, DRUM_NOTES.hihatClosed, 60 * intensity, 0.3);
+      if (isOffbeat && !kickOnly) add(step, DRUM_NOTES.hihatClosed, 46 * intensity, 0.3);
     }
   }
 
@@ -295,10 +295,17 @@ export function generateBassPattern(
     add(0, rootMidi(2), 115 * intensity, 7.5);
     add(8, fifthMidi(2), 105 * intensity, 7.5);
   } else if (patternType === 'jarre_bass') {
-    // Slow, hypnotic root-fifth with longer sustain.
-    add(0, rootMidi(2), 95 * intensity, 7);
-    if (ctx.barIndex % 2 === 1) {
-      add(8, fifthMidi(2), 85 * intensity, 7);
+    // Slow, hypnotic root-fifth with longer sustain; vary every 4 bars.
+    const variation = Math.floor(ctx.barIndex / 4) % 2;
+    if (variation === 0) {
+      add(0, rootMidi(2), 95 * intensity, 7);
+      if (ctx.barIndex % 2 === 1) {
+        add(8, fifthMidi(2), 85 * intensity, 7);
+      }
+    } else {
+      add(0, rootMidi(2), 90 * intensity, 5);
+      add(6, fifthMidi(2), 80 * intensity, 5);
+      add(10, rootMidi(2), 85 * intensity, 5);
     }
   } else {
     add(0, rootMidi(2), 100 * intensity, 8);
@@ -329,15 +336,27 @@ export function generateArpeggioPattern(
   const intensity = section === 'drop' ? 1.1 : section === 'build' ? 1.05 : section === 'break' ? 0.7 : 0.85;
   const arpProb = densityProbability(ctx.density);
 
+  // Vary arp direction every phrase for less repetition.
+  const phrase = Math.floor(ctx.barIndex / 2);
+  const directionMode = patternType === 'arp_up_down'
+    ? 'up_down'
+    : patternType === 'arp_down' || patternType === 'arp_slow_down'
+    ? 'down'
+    : phrase % 3 === 1
+    ? 'down'
+    : phrase % 3 === 2
+    ? 'up_down'
+    : 'up';
+
   for (let step = 0; step < steps; step++) {
     if (rng() > arpProb) continue;
     if (ctx.style === 'ambient' && step % 2 === 1) continue;
     if ((section === 'intro' || section === 'outro') && step % 2 === 1) continue;
 
     let noteIndex: number;
-    if (patternType === 'arp_down' || patternType === 'arp_slow_down') {
+    if (directionMode === 'down') {
       noteIndex = notes.length - 1 - (step % notes.length);
-    } else if (patternType === 'arp_up_down') {
+    } else if (directionMode === 'up_down') {
       const cycle = step % (notes.length * 2 - 2);
       noteIndex = cycle < notes.length ? cycle : notes.length * 2 - 2 - cycle;
     } else {
@@ -456,10 +475,13 @@ export function generateLeadPattern(
   }
 
   if (patternType === 'oxygene_lead') {
-    const note1 = shifted[ctx.barIndex % shifted.length];
+    // Long evolving notes with phrase-level variation.
+    const phrase = Math.floor(ctx.barIndex / 4) % 2;
+    const notePool = phrase === 0 ? shifted : shifted.map((n) => n + (rng() > 0.5 ? 7 : 0));
+    const note1 = notePool[ctx.barIndex % notePool.length];
     add(0, barTicks, note1, 70 * intensity);
     if (ctx.barIndex % 2 === 1 && section !== 'intro' && section !== 'outro') {
-      const note2 = shifted[(ctx.barIndex + 2) % shifted.length];
+      const note2 = notePool[(ctx.barIndex + 2) % notePool.length];
       add(barTicks / 2, barTicks / 2, note2, 65 * intensity);
     }
   } else if (patternType === 'melody') {

@@ -69,12 +69,21 @@ export function StepSequencer({ selectedRegion, currentStep = -1, onChange }: St
 
   return (
     <div className="flex h-full flex-col bg-apple-bg p-3">
-      <div className="mb-3 text-xs font-semibold text-apple-text">Step Sequencer</div>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-xs font-semibold text-apple-text">Step Sequencer</div>
+        <div className="flex gap-0.5">
+          {[1, 2, 3, 4].map((beat) => (
+            <div key={beat} className="flex w-16 justify-center text-[9px] text-apple-muted">
+              {beat}
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-col gap-1.5">
         {ROWS.map((row) => (
           <div key={row.note} className="flex items-center gap-2">
             <div className="w-20 shrink-0 text-[10px] font-medium text-apple-muted">{row.label}</div>
-            <div className="flex flex-1 gap-1">
+            <div className="flex flex-1 gap-0.5">
               {grid[row.note].map((active, step) => (
                 <button
                   key={step}
@@ -82,9 +91,9 @@ export function StepSequencer({ selectedRegion, currentStep = -1, onChange }: St
                   onClick={() => toggleStep(row.note, step)}
                   className={`h-8 flex-1 rounded-sm border transition ${
                     active
-                      ? 'border-apple-accent bg-apple-accent'
+                      ? 'border-apple-accent bg-apple-accent shadow-[0_0_8px_rgba(59,130,246,0.5)]'
                       : 'border-apple-border bg-apple-surface hover:bg-apple-surface-raised'
-                  } ${step % 4 === 0 ? 'opacity-100' : 'opacity-70'} ${
+                  } ${step % 4 === 0 ? 'opacity-100' : 'opacity-60'} ${
                     currentStep === step ? 'ring-1 ring-white' : ''
                   }`}
                 />
@@ -94,7 +103,7 @@ export function StepSequencer({ selectedRegion, currentStep = -1, onChange }: St
         ))}
       </div>
       <div className="mt-3 text-[10px] text-apple-muted">
-        Click steps to toggle. 16 steps = 4 beats.
+        Click steps to toggle. Each number = one beat. 16 steps = 4 beats.
       </div>
     </div>
   );

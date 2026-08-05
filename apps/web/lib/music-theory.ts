@@ -38,7 +38,7 @@ const CHORD_INTERVALS: Record<string, number[]> = {
   aug: [0, 4, 8],
 };
 
-const CHORD_PATTERN = /([A-G][#b]?)(m(?:in)?|maj7?|7|sus4|dim|aug)?/;
+const CHORD_PATTERN = /([A-G][#b]?)(m7b5|m7|m(?:in)?|maj7?|7|sus4|dim|aug)?/;
 
 export function noteToMidi(note: string): number {
   const parsed = note.match(CHORD_PATTERN);
@@ -123,26 +123,28 @@ function getNoteName(midiNote: number): string {
 const STYLE_PROGRESSIONS: Record<string, Record<string, string[][]>> = {
   jarre: {
     minor: [
-      ['Dm', 'C', 'Bb', 'A'],
-      ['Dm', 'Am', 'Gm', 'A'],
-      ['Dm', 'C', 'Gm', 'A'],
+      ['Dm', 'Cadd9', 'Bb', 'Asus4'],
+      ['Dm7', 'C', 'Gm7', 'A'],
+      ['Dm', 'Am7', 'Gm', 'Asus4'],
+      ['Dm', 'C', 'Bb', 'F/A'],
     ],
     major: [
       ['C', 'G/B', 'Am', 'F'],
-      ['C', 'Am', 'F', 'G'],
-      ['F', 'C', 'G', 'Am'],
+      ['Cadd9', 'Am7', 'F', 'G'],
+      ['F', 'C/E', 'G', 'Am'],
     ],
   },
   ambient: {
     minor: [
-      ['Am', 'G', 'F', 'G'],
-      ['Am', 'F', 'C', 'G'],
-      ['Am', 'Em', 'F', 'C'],
+      ['Am9', 'G', 'Fmaj7', 'G'],
+      ['Am7', 'F', 'C', 'G'],
+      ['Am', 'Em', 'Fadd9', 'C'],
+      ['Am7', 'G/B', 'Fmaj7', 'C/E'],
     ],
     major: [
-      ['C', 'G/B', 'Am', 'F'],
-      ['F', 'C', 'G', 'Am'],
-      ['C', 'Em', 'F', 'G'],
+      ['C', 'G/B', 'Am7', 'F'],
+      ['Fmaj7', 'C', 'G', 'Am'],
+      ['C', 'Em', 'Fadd9', 'G'],
     ],
   },
   synthwave: {
@@ -150,6 +152,7 @@ const STYLE_PROGRESSIONS: Record<string, Record<string, string[][]>> = {
       ['Am', 'F', 'Dm', 'G'],
       ['Dm', 'Am', 'F', 'G'],
       ['Am', 'G', 'F', 'Em'],
+      ['Am', 'Fmaj7', 'Dm7', 'G'],
     ],
     major: [
       ['F', 'G', 'Em', 'Am'],
@@ -162,6 +165,7 @@ const STYLE_PROGRESSIONS: Record<string, Record<string, string[][]>> = {
       ['Dm', 'Bb', 'F', 'C'],
       ['Dm', 'C', 'Bb', 'F'],
       ['Dm', 'Am', 'Bb', 'F'],
+      ['Dm', 'Bb', 'F', 'C/E'],
     ],
     major: [
       ['C', 'G', 'Am', 'F'],
@@ -186,6 +190,7 @@ const STYLE_PROGRESSIONS: Record<string, Record<string, string[][]>> = {
       ['Am', 'F', 'C', 'G'],
       ['Am', 'G', 'F', 'G'],
       ['Dm', 'Am', 'Bb', 'F'],
+      ['Am7', 'F', 'C', 'G/B'],
     ],
     major: [
       ['C', 'G', 'Am', 'F'],
@@ -255,7 +260,20 @@ export function transposeProgression(
     const suffix = parsed[2] || '';
     const keyIndex = KEY_INDEX[key] ?? 0;
     const newIndex = (keyIndex + offset + 12) % 12;
-    return names[newIndex] + suffix;
+    const transposedRoot = names[newIndex] + suffix;
+
+    // Preserve slash chords (e.g. F/A -> G/B in C major).
+    const slashIndex = chord.indexOf('/');
+    if (slashIndex === -1) return transposedRoot;
+
+    const bassPart = chord.slice(slashIndex + 1);
+    const bassParsed = bassPart.match(CHORD_PATTERN);
+    if (!bassParsed) return transposedRoot;
+    const bassKey = bassParsed[1];
+    const bassSuffix = bassParsed[2] || '';
+    const bassKeyIndex = KEY_INDEX[bassKey] ?? 0;
+    const newBassIndex = (bassKeyIndex + offset + 12) % 12;
+    return `${transposedRoot}/${names[newBassIndex]}${bassSuffix}`;
   });
 }
 
@@ -331,8 +349,12 @@ export function defaultPatternType(trackName: string, style: string, seed = Date
   }
   if (name.includes('arpeggio')) {
     const jarreArps = ['arp_slow_up', 'arp_slow_down', 'arp_up_down'];
-    if (name.includes('1')) return style === 'jarre' ? jarreArps[Math.floor(rng() * jarreArps.length)] : 'arp_16ths';
-    return style === 'jarre' ? jarreArps[Math.floor(rng() * jarreArps.length)] : rng() > 0.5 ? 'arp_up' : 'arp_up_down';
+    if (name.includes('1')) return style === 'jarre' || style === 'ambient' ? jarreArps[Math.floor(rng() * jarreArps.length)] : 'arp_16ths';
+    return style === 'jarre' || style === 'ambient'
+      ? jarreArps[Math.floor(rng() * jarreArps.length)]
+      : rng() > 0.5
+      ? 'arp_up'
+      : 'arp_up_down';
   }
   if (name.includes('chords') || name.includes('stab')) {
     if (style === 'dance' || style === 'electro') return rng() > 0.5 ? 'chord_stabs' : 'chords';
@@ -420,17 +442,31 @@ export function detectStyle(description: string): string {
   const keywords: Record<string, string> = {
     jarre: 'jarre',
     'jean-michel': 'jarre',
+    'jean michel': 'jarre',
     oxygene: 'jarre',
+    equinoxe: 'jarre',
+    'oxygène': 'jarre',
+    'équinoxe': 'jarre',
+    'magnetic fields': 'jarre',
     kavinsky: 'synthwave',
     synthwave: 'synthwave',
+    retrowave: 'synthwave',
+    outrun: 'synthwave',
+    drive: 'synthwave',
     guetta: 'dance',
+    'david guetta': 'dance',
     edm: 'dance',
+    'big room': 'dance',
+    festival: 'dance',
     house: 'house',
     electro: 'electro',
     dance: 'dance',
     techno: 'techno',
     trance: 'techno',
     ambient: 'ambient',
+    space: 'ambient',
+    cosmic: 'ambient',
+    drone: 'ambient',
   };
   for (const [keyword, style] of Object.entries(keywords)) {
     if (lowered.includes(keyword)) return style;

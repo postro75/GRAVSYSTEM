@@ -1,37 +1,34 @@
-> Aktualny plan wynika bezpośrednio z `docs/Roadmap.md` i `docs/Phase 1 ROI Critique.md`.
+> Next steps are driven by `docs/Roadmap.md` and `docs/Phase 15 ROI Critique.md`.
 
-## Aktualna faza: Phase 2 — Browser DAW UI
+## Current focus: Phase 16 — Pro sound and backend render
 
-Phase 0 — Foundation ✅ i Phase 1 — Text-to-MIDI Core ✅ zakończone.
+Phase 15 is shipped. The highest-ROI next moves are:
 
-### Najwyższy priorytet (największy ROI)
+### Highest priority
 
-1. **Piano roll / edytor MIDI**
-   - Kliknięcie regionu otwiera edytor nut.
-   - Możliwość dodawania, przesuwania, usuwania nut.
+1. **Side-chain kick ducking**
+   - The audio engine already has `sidechainGains` per track. Wire the kick pattern to duck pads/bass in dance/synthwave styles for the club pumping feel.
 
-2. **Odtwarzanie z transportu**
-   - Podłączyć Play/Pause/Stop do Tone.js.
-   - Cursor na timeline pokazuje aktualną pozycję.
+2. **First real WAM plugin**
+   - Integrate a browser plugin (Dexed FM, OB-Xd, or Vital web build) behind a feature flag.
+   - Load it as an AudioWorklet and route MIDI/audio through the existing track channel.
 
-3. **Ujednolicenie backendu**
-   - Wybrać: FastAPI (rekomendowane) lub Next.js functions.
-   - Jeśli FastAPI — zdeployować na Render/Railway/Fly.
+3. **Backend high-quality render**
+   - Add a DawDreamer/Carla-based render pipeline (local or server) for offline WAV export with real VST instruments.
 
-### Średni priorytet
+### Medium priority
 
-4. **Lepsze sample'y**
-   - Zamiana syntetycznych WAV na prawdziwe sample perkusji.
+4. **Phrase memory for leads/arps**
+   - Replace pure random walks with short memorable motifs that repeat and vary, like real hooks.
 
-5. **Export MIDI z backendu**
-   - `/api/generate` zwraca też plik `.mid`.
+5. **Per-track EQ and style-aware insert FX defaults**
+   - Give each track a sensible starting EQ/compression shape based on its category and style.
 
-6. **Mixer podstawowy**
-   - Volume/pan per track.
+6. **Better sample content**
+   - Move beyond FluidR3_GM to higher-quality SFZ/SoundFont libraries or recorded one-shots.
 
-### Decyzje do podjęcia
+### Decisions to make
 
-- Stack generowania: FastAPI vs Next.js functions.
-- Hostowanie FastAPI: Render/Railway/Fly.
-- Open-source vs komercyjny.
-- Budżet API (Stable Audio, Grok, Kimi).
+- WAM integration depth: one demo plugin vs full rack.
+- Backend render hosting: local Python service vs Vercel function vs dedicated server.
+- Budget for external APIs (Stable Audio, Grok, Kimi) and sample content licensing.
