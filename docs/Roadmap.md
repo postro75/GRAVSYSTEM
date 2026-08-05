@@ -186,12 +186,27 @@ Each phase ends with: **internal review → user testing → bug fixes → GitHu
 
 ---
 
+## Shipped phases (beyond original roadmap)
+
+The project has been built incrementally in smaller phases than originally planned. The most recent shipped phase is **Phase 16 — Side-Chain Ducking, Real WAM Plugin, Backend Render Prototype**.
+
+Highlights:
+- Side-chain kick ducking with style-aware curves.
+- First real WAM instrument plugin (Synth-101) behind `NEXT_PUBLIC_ENABLE_WAM`.
+- DawDreamer offline-render prototype with MIDI fallback.
+- 50 vitest tests + 7 pytest tests green; production deployment live at `https://gravsystem.vercel.app`.
+
+See `docs/Phase 16 ROI Critique.md` for details.
+
 ## Ongoing Cycles
 
-After Phase 7, work continues in 2-week sprints focused on:
-1. Quality improvements from user feedback.
-2. New style presets and instrument packs.
-3. API expansion.
-4. Performance and reliability.
+After Phase 16, work continues in 2-week sprints focused on:
+1. Additional WAM plugins (polyphonic synths for pads/chords).
+2. Exposing WAM plugin GUIs and WAM-aware preset generation.
+3. Wiring backend render to a `/api/render` endpoint with user-facing export.
+4. Quality improvements from user feedback.
+5. New style presets and instrument packs.
+6. API expansion.
+7. Performance and reliability.
 
 Each cycle ends with: review, tests, docs update, commit, Obsidian sync.

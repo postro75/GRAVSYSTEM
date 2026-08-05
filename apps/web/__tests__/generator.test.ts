@@ -127,6 +127,42 @@ describe('generateProject', () => {
     expect(sparse).toBeLessThanOrEqual(medium);
     expect(medium).toBeLessThanOrEqual(dense);
   });
+
+  it('enables side-chain on pumping-style tracks by default', () => {
+    const dance = generateProject({
+      description: 'Dance track',
+      style: 'dance',
+      bpm: 128,
+      bars: 16,
+      key: 'D',
+      scale: 'minor',
+    });
+
+    const bass = dance.tracks.find((t) => t.name.toLowerCase().includes('bass'));
+    expect(bass?.sidechain).toBe(true);
+
+    const pad = dance.tracks.find((t) => t.name.toLowerCase().includes('pad'));
+    if (pad) {
+      expect(pad.sidechain).toBe(true);
+    }
+
+    const drums = dance.tracks.find((t) => t.name.toLowerCase().includes('drum'));
+    expect(drums?.sidechain).toBe(false);
+  });
+
+  it('keeps side-chain off for jarre/ambient tracks', () => {
+    const jarre = generateProject({
+      description: 'Jarre ambient',
+      style: 'jarre',
+      bpm: 108,
+      bars: 32,
+      key: 'D',
+      scale: 'minor',
+    });
+
+    const sidechainOn = jarre.tracks.filter((t) => t.sidechain);
+    expect(sidechainOn.length).toBe(0);
+  });
 });
 
 describe('defaultArrangement', () => {

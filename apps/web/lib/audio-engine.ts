@@ -24,6 +24,7 @@ import {
   clampInstrumentParams,
   type InstrumentParams,
 } from './instrument-params';
+import { loadSynth101, WamInstrument } from './wam-host';
 
 export interface AudioEngineState {
   isPlaying: boolean;
@@ -38,7 +39,8 @@ export type PlayableInstrument =
   | Tone.DuoSynth
   | Tone.FMSynth
   | Tone.AMSynth
-  | Soundfont;
+  | Soundfont
+  | WamInstrument;
 
 function isDrumTrackName(name: string): boolean {
   const lowered = name.toLowerCase();
@@ -81,6 +83,22 @@ export function mapInsertEffects(effects: InsertEffects) {
     compressorThreshold: effects.compressor * 30 - 30, // -30 dB .. 0 dB
     compressorRatio: 1 + effects.compressor * 11, // 1:1 .. 12:1
   };
+}
+
+interface SidechainCurve {
+  floor: number;
+  attack: number;
+  release: number;
+}
+
+export function sidechainCurve(style: string): SidechainCurve {
+  const s = style.toLowerCase();
+  if (s === 'techno') return { floor: 0.35, attack: 0.015, release: 0.18 };
+  if (s === 'house') return { floor: 0.45, attack: 0.02, release: 0.28 };
+  if (s === 'synthwave') return { floor: 0.4, attack: 0.02, release: 0.35 };
+  if (s === 'ambient' || s === 'jarre') return { floor: 0.85, attack: 0.05, release: 0.5 };
+  // dance / electro default
+  return { floor: 0.4, attack: 0.02, release: 0.25 };
 }
 
 export class AudioEngine {
@@ -340,6 +358,13 @@ export class AudioEngine {
       return synth;
     }
 
+    if (def.type === 'wam') {
+      const context = Tone.context.rawContext as AudioContext;
+      const wam = await loadSynth101(context);
+      (wam.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
+      return wam;
+    }
+
     // Soundfont: macros apply to the track-level filter/sends, not the Soundfont itself.
     const context = Tone.context.rawContext as AudioContext;
     const soundfont = new Soundfont(context, {
@@ -454,7 +479,9 @@ export class AudioEngine {
     const instrument = this.instruments.get(trackId);
     if (!instrument) return;
 
-    if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
+    if ('scheduleNote' in instrument && typeof instrument.scheduleNote === 'function') {
+      instrument.scheduleNote(pitch, Tone.now(), dur, Math.round(vel * 127));
+    } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
       instrument.triggerAttackRelease(pitch, dur, Tone.now(), vel);
     } else {
       (instrument as Soundfont).start({
@@ -506,13 +533,16 @@ export class AudioEngine {
         // Schedule kick separately for sidechain trigger
         const kickNotes = notes.filter((n) => n.note === 36);
         if (kickNotes.length > 0) {
+          const duckCurve = sidechainCurve(this.project?.style ?? 'dance');
           const kickPart = new Tone.Part<ScheduledNote>((time) => {
-            this.sidechainGains.forEach((gain) => {
+            for (const [trackId, gain] of this.sidechainGains) {
+              const track = this.project?.tracks.find((t) => t.id === trackId);
+              if (!track?.sidechain) continue;
               gain.gain.cancelScheduledValues(time);
               gain.gain.setValueAtTime(1, time);
-              gain.gain.exponentialRampToValueAtTime(0.45, time + 0.02);
-              gain.gain.exponentialRampToValueAtTime(1, time + 0.25);
-            });
+              gain.gain.exponentialRampToValueAtTime(duckCurve.floor, time + duckCurve.attack);
+              gain.gain.exponentialRampToValueAtTime(1, time + duckCurve.release);
+            }
           }, kickNotes);
           kickPart.start(0);
           this.parts.push(kickPart);
@@ -529,7 +559,9 @@ export class AudioEngine {
 
         const part = new Tone.Part<ScheduledNote>((time, value) => {
           const vel = Math.max(0, Math.min(1, value.velocity));
-          if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
+          if ('scheduleNote' in instrument && typeof instrument.scheduleNote === 'function') {
+            instrument.scheduleNote(value.note, time, value.duration, Math.round(vel * 127));
+          } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
             instrument.triggerAttackRelease(value.note, value.duration, time, vel);
           } else {
             (instrument as Soundfont).start({
@@ -694,6 +726,13 @@ export class AudioEngine {
     if (!track || !this.project) return;
     track.automation = points;
     this.scheduleAutomation(this.project);
+  }
+
+  /** Toggle whether a track participates in kick-driven side-chain ducking. */
+  updateSidechain(trackId: string, sidechain: boolean) {
+    const track = this.project?.tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    track.sidechain = sidechain;
   }
 
   /** Get per-track linear level readings (0–1) for the UI meters. */

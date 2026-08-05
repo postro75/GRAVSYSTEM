@@ -63,14 +63,15 @@ describe('music theory', () => {
   });
 
   it('builds config with overrides', () => {
-    const config = buildConfig('Jarre ambient 108 BPM D minor 32 bars', {});
+    const seed = 12345;
+    const config = buildConfig('Jarre ambient 108 BPM D minor 32 bars', { seed });
     expect(config.bpm).toBe(108);
     expect(config.bars).toBe(32);
     expect(config.key).toBe('D');
     expect(config.scale).toBe('minor');
     expect(config.style).toBe('jarre');
-    expect(config.seed).toBeDefined();
-    expect(config.chordProgression).toEqual(defaultProgression('minor', 'jarre', config.seed));
+    expect(config.seed).toBe(seed);
+    expect(config.chordProgression).toEqual(defaultProgression('minor', 'jarre', seed));
   });
 
   it('uses style defaults when no overrides', () => {

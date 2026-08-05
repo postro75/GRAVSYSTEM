@@ -12,6 +12,20 @@ import { generateMidiEvents, eventsToMidiEvents } from './pattern-generator';
 import { inferInstrumentForTrack, getInstrumentById } from './instruments';
 import { defaultParamsForStyle } from './instrument-params';
 
+function defaultSidechainForTrack(trackName: string, style: string): boolean {
+  const pumpingStyles = new Set(['dance', 'electro', 'house', 'techno', 'synthwave']);
+  if (!pumpingStyles.has(style.toLowerCase())) return false;
+  const name = trackName.toLowerCase();
+  return (
+    name.includes('pad') ||
+    name.includes('string') ||
+    name.includes('bass') ||
+    name.includes('chords') ||
+    name.includes('stab') ||
+    name.includes('drone')
+  );
+}
+
 export function generateProject(request: GenerationRequest): Project {
   const config = buildConfig(request.description, {
     style: request.style,
@@ -35,6 +49,7 @@ export function generateProject(request: GenerationRequest): Project {
       instrumentParams: defaultParamsForStyle(config.style),
       insertEffects: DEFAULT_INSERT_EFFECTS,
       automation: [],
+      sidechain: defaultSidechainForTrack(trackName, config.style),
       channel: tracks.length + 1,
     });
 

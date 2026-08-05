@@ -50,6 +50,9 @@
   "dependencies": {
     "@gravsystem/core": "^1.0.0",
     "@tonejs/midi": "^2.0.28",
+    "@webaudiomodules/api": "^2.0.0-alpha.6",
+    "@webaudiomodules/sdk": "^0.0.12",
+    "burns-audio-wam": "^0.2.54",
     "clsx": "^2.1.1",
     "dexie": "^4.4.4",
     "lucide-react": "^0.474.0",

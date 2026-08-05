@@ -424,6 +424,20 @@ export default function Home() {
     setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
   };
 
+  const handleSidechainChange = (trackId: string, sidechain: boolean) => {
+    if (!dawProject) return;
+    playerRef.current?.updateSidechain(trackId, sidechain);
+    const nextProject: Project = {
+      ...dawProject,
+      tracks: dawProject.tracks.map((track) =>
+        track.id === trackId ? { ...track, sidechain } : track
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+    setDawProject(nextProject);
+    setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
+  };
+
   const selectedTrack = dawProject?.tracks.find((t) => t.id === selectedTrackId) ?? null;
 
   return (
@@ -566,6 +580,7 @@ export default function Home() {
           onInstrumentPreview={handleInstrumentPreview}
           onInstrumentParamsChange={handleInstrumentParamsChange}
           onInsertEffectsChange={handleInsertEffectsChange}
+          onSidechainChange={handleSidechainChange}
         />
       </main>
 

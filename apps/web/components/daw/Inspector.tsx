@@ -23,6 +23,7 @@ export interface InspectorProps {
   onInstrumentPreview?: (trackId: string, instrumentId: string) => void;
   onInstrumentParamsChange?: (trackId: string, params: import('@gravsystem/core').InstrumentParams) => void;
   onInsertEffectsChange?: (trackId: string, effects: import('@gravsystem/core').InsertEffects) => void;
+  onSidechainChange?: (trackId: string, sidechain: boolean) => void;
 }
 
 function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
@@ -45,6 +46,7 @@ export function Inspector({
   onInstrumentPreview,
   onInstrumentParamsChange,
   onInsertEffectsChange,
+  onSidechainChange,
 }: InspectorProps) {
   const style = selectedTrack ? trackStyle(selectedTrack.name) : null;
   const Icon = style?.icon;
@@ -90,6 +92,17 @@ export function Inspector({
             <InfoRow label="Volume" value={`${Math.round((selectedTrack.volume ?? 1) * 100)}%`} />
             <InfoRow label="Pan" value={selectedTrack.pan ?? 0} />
             <InfoRow label="Regions" value={selectedTrack.regions.length} />
+            {onSidechainChange && (
+              <label className="mt-2 flex cursor-pointer items-center justify-between rounded-apple-sm border border-apple-border bg-apple-surface px-2 py-1.5 text-xs transition hover:bg-apple-surface-raised">
+                <span className="text-apple-muted">Side-chain</span>
+                <input
+                  type="checkbox"
+                  checked={selectedTrack.sidechain ?? false}
+                  onChange={(e) => onSidechainChange(selectedTrack.id, e.target.checked)}
+                  className="h-4 w-4 accent-apple-accent"
+                />
+              </label>
+            )}
           </div>
         )}
 

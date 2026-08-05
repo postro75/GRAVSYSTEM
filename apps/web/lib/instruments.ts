@@ -1,7 +1,7 @@
 import * as Tone from 'tone';
 import { mulberry32 } from './music-theory';
 
-export type InstrumentType = 'custom' | 'soundfont' | 'drums';
+export type InstrumentType = 'custom' | 'soundfont' | 'drums' | 'wam';
 
 export interface InstrumentDefinition {
   id: string;
@@ -25,6 +25,8 @@ export const INSTRUMENT_CATEGORIES: Record<InstrumentDefinition['category'], str
   strings: 'Strings',
   fx: 'FX',
 };
+
+const WAM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_WAM === 'true';
 
 export const INSTRUMENTS: InstrumentDefinition[] = [
   // Bass
@@ -81,6 +83,18 @@ export const INSTRUMENTS: InstrumentDefinition[] = [
   { id: 'sci-fi-fx', name: 'Sci-Fi FX', category: 'fx', type: 'custom', config: 'synth', color: '#14b8a6', description: 'Rising sci-fi effect' },
   { id: 'jarre-fx', name: 'Jarre FX', category: 'fx', type: 'custom', config: 'synth', color: '#14b8a6', description: 'Space swoosh and noise' },
 ];
+
+if (WAM_ENABLED) {
+  INSTRUMENTS.push({
+    id: 'wam-synth101',
+    name: 'Synth-101 (WAM)',
+    category: 'lead',
+    type: 'wam',
+    config: 'synth101',
+    color: '#a855f7',
+    description: 'Real WAM plugin: Roland SH-101 clone (experimental)',
+  });
+}
 
 export function getInstrumentById(id: string): InstrumentDefinition | undefined {
   return INSTRUMENTS.find((inst) => inst.id === id);
