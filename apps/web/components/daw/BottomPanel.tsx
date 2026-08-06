@@ -9,6 +9,7 @@ import { StepSequencer } from './StepSequencer';
 import { VirtualPiano } from './VirtualPiano';
 import { AutomationEditor } from './AutomationEditor';
 import { Piano, SlidersHorizontal, Music, Grid3X3, Keyboard, Activity } from 'lucide-react';
+import { SnapGrid, ToolMode } from './TransportBar';
 
 export type BottomTab = 'piano' | 'mixer' | 'chords' | 'sequencer' | 'keyboard' | 'automation';
 
@@ -22,6 +23,8 @@ export interface BottomPanelProps {
   scale?: 'major' | 'minor';
   position?: number; // seconds
   activeTab?: BottomTab;
+  snapGrid?: SnapGrid;
+  toolMode?: ToolMode;
   onActiveTabChange?: (tab: BottomTab) => void;
   onRegionChange?: (region: Region) => void;
   onTrackChange: (trackId: string, updates: Partial<Pick<Track, 'volume' | 'pan' | 'mute' | 'solo'>>) => void;
@@ -51,6 +54,8 @@ export function BottomPanel({
   scale = 'minor',
   position = 0,
   activeTab: controlledTab,
+  snapGrid = '1/16',
+  toolMode = 'cursor',
   onActiveTabChange,
   onRegionChange,
   onTrackChange,
@@ -93,7 +98,16 @@ export function BottomPanel({
       {/* Content */}
       <div className="min-h-0 flex-1">
         {activeTab === 'piano' && selectedRegion && (
-          <PianoRoll region={selectedRegion} bpm={bpm} onChange={onRegionChange} />
+          <PianoRoll
+            region={selectedRegion}
+            bpm={bpm}
+            bars={bars}
+            keyRoot={keyRoot}
+            scale={scale}
+            snapGrid={snapGrid}
+            toolMode={toolMode}
+            onChange={onRegionChange}
+          />
         )}
         {activeTab === 'piano' && !selectedRegion && (
           <div className="flex h-full items-center justify-center text-xs text-apple-muted">

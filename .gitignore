@@ -14,3 +14,5 @@ __pycache__/
 release/
 apps/web/release/
 apps/web/dist/
+desktop/build/
+apps/api/uv.lock

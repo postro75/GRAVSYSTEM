@@ -77,6 +77,10 @@ export const DEFAULT_INSERT_EFFECTS = {
   chorus: 0,
   eq: 0,
   compressor: 0,
+  distortionBypass: false,
+  chorusBypass: false,
+  eqBypass: false,
+  compressorBypass: false,
 };
 
 export const InsertEffectsSchema = z.object({
@@ -84,6 +88,10 @@ export const InsertEffectsSchema = z.object({
   chorus: z.number().min(0).max(1).default(0),
   eq: z.number().min(0).max(1).default(0),
   compressor: z.number().min(0).max(1).default(0),
+  distortionBypass: z.boolean().default(false),
+  chorusBypass: z.boolean().default(false),
+  eqBypass: z.boolean().default(false),
+  compressorBypass: z.boolean().default(false),
 });
 
 export const RegionSchema = z.object({

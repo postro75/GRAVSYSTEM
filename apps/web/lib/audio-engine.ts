@@ -74,14 +74,20 @@ interface TrackChannel {
 }
 
 export function mapInsertEffects(effects: InsertEffects) {
+  const bypassed = {
+    distortion: effects.distortionBypass ?? false,
+    chorus: effects.chorusBypass ?? false,
+    eq: effects.eqBypass ?? false,
+    compressor: effects.compressorBypass ?? false,
+  };
   return {
-    distortion: effects.distortion * 0.8,
-    chorusWet: effects.chorus * 0.6,
-    eqLow: (effects.eq - 0.5) * 12, // -6 dB .. +6 dB
-    eqMid: (effects.eq - 0.5) * 12,
-    eqHigh: (effects.eq - 0.5) * 12,
-    compressorThreshold: effects.compressor * 30 - 30, // -30 dB .. 0 dB
-    compressorRatio: 1 + effects.compressor * 11, // 1:1 .. 12:1
+    distortion: bypassed.distortion ? 0 : effects.distortion * 0.8,
+    chorusWet: bypassed.chorus ? 0 : effects.chorus * 0.6,
+    eqLow: bypassed.eq ? 0 : (effects.eq - 0.5) * 12, // -6 dB .. +6 dB
+    eqMid: bypassed.eq ? 0 : (effects.eq - 0.5) * 12,
+    eqHigh: bypassed.eq ? 0 : (effects.eq - 0.5) * 12,
+    compressorThreshold: bypassed.compressor ? 0 : effects.compressor * 30 - 30, // -30 dB .. 0 dB
+    compressorRatio: bypassed.compressor ? 1 : 1 + effects.compressor * 11, // 1:1 .. 12:1
   };
 }
 
@@ -103,6 +109,7 @@ export function sidechainCurve(style: string): SidechainCurve {
 
 export class AudioEngine {
   private project: Project | null = null;
+  private pendingProject: Project | null = null;
   private onStateChange?: (state: AudioEngineState) => void;
   private isStarted = false;
   private parts: Tone.Part[] = [];
@@ -176,13 +183,23 @@ export class AudioEngine {
       await Tone.start();
       this.isStarted = true;
       this.emit({ isReady: true });
+      // If a project was queued before audio was allowed, load it now.
+      if (this.pendingProject) {
+        const project = this.pendingProject;
+        this.pendingProject = null;
+        await this.loadProject(project);
+      }
     } catch (err) {
       this.emit({ error: err instanceof Error ? err.message : 'Audio engine resume failed' });
     }
   }
 
   async loadProject(project: Project) {
-    if (!this.isStarted) return;
+    if (!this.isStarted) {
+      // AudioContext not allowed yet — queue the project for resumeAudio().
+      this.pendingProject = project;
+      return;
+    }
     this.emit({ loading: true, isReady: false });
     this.disposeParts();
     this.project = project;

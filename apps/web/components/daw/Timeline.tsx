@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Track, Region } from '@gravsystem/core';
 import { ZoomIn, ZoomOut, MoveHorizontal, Copy, Trash2 } from 'lucide-react';
 import { trackStyle } from '@/lib/track-styles';
+import { SnapGrid, ToolMode } from './TransportBar';
 
 export interface TimelineProps {
   tracks?: Track[];
@@ -11,6 +12,8 @@ export interface TimelineProps {
   position?: number; // seconds
   bpm?: number;
   selectedRegionId?: string | null;
+  snapGrid?: SnapGrid;
+  toolMode?: ToolMode;
   onRegionClick?: (track: Track, region: Region) => void;
   onRegionChange?: (updatedRegion: Region) => void;
   onRegionDuplicate?: (region: Region) => void;
@@ -23,6 +26,8 @@ export function Timeline({
   position = 0,
   bpm = 120,
   selectedRegionId,
+  snapGrid = '1/16',
+  toolMode = 'cursor',
   onRegionClick,
   onRegionChange,
   onRegionDuplicate,
@@ -50,6 +55,8 @@ export function Timeline({
 
   const minBeatWidth = 24;
   const maxBeatWidth = 120;
+
+  const snapStep = snapGrid === 'off' ? 0.015625 : 1 / Number(snapGrid.split('/')[1]);
 
   const handleZoom = (delta: number) => {
     setBeatWidth((prev) => Math.max(minBeatWidth, Math.min(maxBeatWidth, prev + delta)));
@@ -85,10 +92,11 @@ export function Timeline({
       const { startBeat, startDuration, mode: m } = dragRef.current;
 
       if (m === 'move') {
-        const newStart = Math.max(0, Math.round((startBeat + dxBeats) * 4) / 4);
+        const newStart = Math.max(0, Math.round((startBeat + dxBeats) / snapStep) * snapStep);
         setDraggingRegion({ id: dragRef.current.region.id, startBeat: newStart, duration: startDuration });
       } else {
-        const newDuration = Math.max(0.25, Math.round((startDuration + dxBeats) * 4) / 4);
+        const minDuration = snapGrid === 'off' ? 0.0625 : snapStep;
+        const newDuration = Math.max(minDuration, Math.round((startDuration + dxBeats) / snapStep) * snapStep);
         setDraggingRegion({ id: dragRef.current.region.id, startBeat, duration: newDuration });
       }
     };
@@ -143,15 +151,22 @@ export function Timeline({
           className="relative h-full"
           style={{ width: totalBeats * beatWidth }}
         >
-          {Array.from({ length: bars }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute top-0 bottom-0 border-l border-apple-border pl-1 text-[10px] text-apple-muted"
-              style={{ left: i * 4 * beatWidth, width: 4 * beatWidth }}
-            >
-              <span>{i + 1}</span>
-            </div>
-          ))}
+          {Array.from({ length: totalBeats }).map((_, i) => {
+            const isBar = i % 4 === 0;
+            return (
+              <div
+                key={i}
+                className={`absolute top-0 bottom-0 border-l ${
+                  isBar ? 'border-apple-border' : 'border-apple-border/40'
+                }`}
+                style={{ left: i * beatWidth }}
+              >
+                {isBar && (
+                  <span className="ml-1 text-[10px] text-apple-muted">{i / 4 + 1}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -168,28 +183,56 @@ export function Timeline({
               return (
                 <div
                   key={track.id}
-                  className="relative h-[4.5rem] border-b border-apple-border hover:bg-white/[0.02]"
+                  className="group relative h-20 border-b border-apple-border transition hover:bg-white/[0.02]"
                 >
+                  {/* Background beat grid */}
+                  {Array.from({ length: totalBeats }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`absolute top-0 bottom-0 border-l ${
+                        i % 4 === 0 ? 'border-apple-border/30' : 'border-apple-border/10'
+                      }`}
+                      style={{ left: i * beatWidth }}
+                    />
+                  ))}
+
                   {track.regions.map((region) => {
                     const visual = resolveRegion(region);
                     const isSelected = selectedRegionId === region.id;
+                    const noteCount = region.midiEvents.length;
                     return (
                       <div
                         key={region.id}
-                        className={`group absolute top-2 bottom-2 cursor-grab rounded-md ring-1 transition active:cursor-grabbing ${
-                          isSelected ? 'ring-white' : ''
+                        className={`absolute top-2 bottom-2 cursor-grab overflow-hidden rounded border transition active:cursor-grabbing ${
+                          isSelected ? 'border-white/80 shadow-lg' : 'border-white/10'
                         }`}
                         style={{
                           left: visual.startBeat * beatWidth,
-                          width: visual.duration * beatWidth,
-                          backgroundColor: `${style.color}${isSelected ? '55' : '33'}`,
-                          borderColor: `${style.color}80`,
+                          width: Math.max(4, visual.duration * beatWidth),
+                          backgroundColor: isSelected ? `${style.color}55` : `${style.color}35`,
                         }}
-                        onClick={() => onRegionClick?.(track, region)}
-                        onPointerDown={(e) => handlePointerDown(e, track, region, 'move')}
+                        onClick={() => {
+                          if (toolMode === 'eraser') {
+                            onRegionDelete?.(region);
+                          } else {
+                            onRegionClick?.(track, region);
+                          }
+                        }}
+                        onPointerDown={(e) => {
+                          if (toolMode === 'eraser') {
+                            e.preventDefault();
+                            onRegionDelete?.(region);
+                            return;
+                          }
+                          if (toolMode !== 'pencil') {
+                            handlePointerDown(e, track, region, 'move');
+                          }
+                        }}
                       >
-                        <div className="flex items-center justify-between px-1.5 py-1">
-                          <div className="truncate text-[10px] font-medium text-white/90">{region.name}</div>
+                        <div className="flex items-center justify-between px-2 py-1">
+                          <div className="truncate text-[10px] font-semibold text-white">
+                            {region.name}
+                          </div>
                           <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                             <button
                               type="button"
@@ -217,9 +260,13 @@ export function Timeline({
                             </button>
                           </div>
                         </div>
+                        <div className="px-2 text-[9px] text-white/70">
+                          {noteCount} note{noteCount !== 1 ? 's' : ''}
+                        </div>
+
                         {/* Resize handle */}
                         <div
-                          className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize bg-white/20 opacity-0 transition group-hover:opacity-100"
+                          className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize bg-white/20 opacity-0 transition hover:opacity-100"
                           onPointerDown={(e) => {
                             e.stopPropagation();
                             handlePointerDown(e, track, region, 'resize');
@@ -237,9 +284,11 @@ export function Timeline({
         {/* Playback cursor */}
         {tracks.length > 0 && (
           <div
-            className="pointer-events-none absolute top-0 bottom-0 w-px bg-apple-accent"
+            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-apple-accent shadow-[0_0_8px_rgba(45,140,255,0.8)]"
             style={{ left: positionBeats * beatWidth }}
-          />
+          >
+            <div className="absolute -top-1 -left-1.5 h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-apple-accent" />
+          </div>
         )}
       </div>
     </div>

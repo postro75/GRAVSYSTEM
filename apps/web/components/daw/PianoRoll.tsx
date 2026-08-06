@@ -3,20 +3,42 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 import { Region, MidiEvent } from '@gravsystem/core';
+import { isInScale, Scale } from '@/lib/music-theory';
+import { SnapGrid, ToolMode } from './TransportBar';
 
 export interface PianoRollProps {
   region: Region;
   bpm?: number;
+  bars?: number;
+  keyRoot?: string;
+  scale?: Scale;
+  snapGrid?: SnapGrid;
+  toolMode?: ToolMode;
   onChange?: (region: Region) => void;
 }
 
 const BEAT_WIDTH = 60;
 const NOTE_HEIGHT = 14;
-const TOTAL_BEATS = 16;
+const DEFAULT_BARS = 16;
+const BEATS_PER_BAR = 4;
 const MIN_PITCH = 36;
 const MAX_PITCH = 96;
+const VELOCITY_LANE_HEIGHT = 72;
 
-export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
+export function PianoRoll({
+  region,
+  bpm = 120,
+  bars = DEFAULT_BARS,
+  keyRoot = 'C',
+  scale = 'minor',
+  snapGrid = '1/16',
+  toolMode = 'cursor',
+  onChange,
+}: PianoRollProps) {
+  const totalBeats = bars * BEATS_PER_BAR;
+  const snapStep = snapGrid === 'off' ? 0.015625 : 1 / Number(snapGrid.split('/')[1]);
+  const gridHeight = (MAX_PITCH - MIN_PITCH + 1) * NOTE_HEIGHT;
+
   const [events, setEvents] = useState<MidiEvent[]>(region.midiEvents);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [history, setHistory] = useState<MidiEvent[][]>([region.midiEvents]);
@@ -24,6 +46,9 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
 
   const previewSynthRef = useRef<Tone.PolySynth | null>(null);
   const previewStartedRef = useRef(false);
+  const gridScrollRef = useRef<HTMLDivElement>(null);
+  const laneScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScrollRef = useRef(false);
 
   const ensurePreviewSynth = async () => {
     if (!previewSynthRef.current) {
@@ -113,20 +138,37 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
+  // Sync horizontal scroll between note grid and velocity lane.
+  const syncScroll = (source: 'grid' | 'lane') => {
+    if (isSyncingScrollRef.current) return;
+    isSyncingScrollRef.current = true;
+    requestAnimationFrame(() => {
+      const grid = gridScrollRef.current;
+      const lane = laneScrollRef.current;
+      if (source === 'grid' && grid && lane) {
+        lane.scrollLeft = grid.scrollLeft;
+      } else if (source === 'lane' && grid && lane) {
+        grid.scrollLeft = lane.scrollLeft;
+      }
+      isSyncingScrollRef.current = false;
+    });
+  };
+
   const snap = (value: number, step: number) => Math.round(value / step) * step;
 
   const handleAdd = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (toolMode !== 'pencil') return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = rect.height - (e.clientY - rect.top);
-    const start = Math.max(0, snap(x / BEAT_WIDTH, 0.25));
+    const start = Math.max(0, snap(x / BEAT_WIDTH, snapStep));
     const pitch = Math.min(MAX_PITCH, Math.max(MIN_PITCH, Math.floor(y / NOTE_HEIGHT) + MIN_PITCH));
 
     const newEvent: MidiEvent = {
       pitch,
       velocity: 100,
       start,
-      duration: 0.25,
+      duration: snapStep,
     };
     playPreview(pitch, 100);
     commit([...events, newEvent]);
@@ -152,7 +194,7 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
     if (selectedId === null) return;
     const index = Number(selectedId);
     const next = events.map((evt, i) =>
-      i === index ? { ...evt, duration: Math.min(4, evt.duration + 0.25) } : evt
+      i === index ? { ...evt, duration: Math.min(4, evt.duration + snapStep) } : evt
     );
     commit(next);
   };
@@ -189,7 +231,7 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
         didDragRef.current = true;
       }
-      const newStart = Math.max(0, snap(startBeat + dx / BEAT_WIDTH, 0.25));
+      const newStart = Math.max(0, snap(startBeat + dx / BEAT_WIDTH, snapStep));
       const newPitch = Math.min(
         MAX_PITCH,
         Math.max(MIN_PITCH, pitch - Math.round(dy / NOTE_HEIGHT))
@@ -215,7 +257,7 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
     };
-  }, [commit]);
+  }, [commit, snapStep]);
 
   const handleNotePointerDown = (e: React.PointerEvent, index: number) => {
     e.stopPropagation();
@@ -233,13 +275,91 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
     setSelectedId(String(index));
   };
 
+  // Velocity lane editing
+  const velocityDragRef = useRef<{
+    index: number;
+    startY: number;
+    startVelocity: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleMove = (e: PointerEvent) => {
+      if (!velocityDragRef.current) return;
+      const { index, startY, startVelocity } = velocityDragRef.current;
+      const dy = startY - e.clientY;
+      const ratio = dy / VELOCITY_LANE_HEIGHT;
+      const nextVelocity = Math.max(1, Math.min(127, Math.round(startVelocity + ratio * 127)));
+      setEvents((prev) =>
+        prev.map((evt, i) => (i === index ? { ...evt, velocity: nextVelocity } : evt))
+      );
+    };
+
+    const handleUp = () => {
+      if (!velocityDragRef.current) return;
+      velocityDragRef.current = null;
+      setEvents((current) => {
+        commit(current);
+        return current;
+      });
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+  }, [commit, snapStep]);
+
+  const handleVelocityPointerDown = (e: React.PointerEvent, index: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const evt = events[index];
+    playPreview(evt.pitch, evt.velocity);
+    velocityDragRef.current = {
+      index,
+      startY: e.clientY,
+      startVelocity: evt.velocity,
+    };
+    setSelectedId(String(index));
+  };
+
+  const handleVelocityLaneClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left + (laneScrollRef.current?.scrollLeft ?? 0);
+    const y = rect.height - (e.clientY - rect.top);
+    const clickBeat = x / BEAT_WIDTH;
+    const clickVelocity = Math.max(1, Math.min(127, Math.round((y / VELOCITY_LANE_HEIGHT) * 127)));
+
+    // Find the closest note under the click and set its velocity.
+    let closestIndex = -1;
+    let closestDistance = Infinity;
+    events.forEach((evt, i) => {
+      const center = evt.start + evt.duration / 2;
+      const distance = Math.abs(center - clickBeat);
+      if (distance < closestDistance && clickBeat >= evt.start - 0.125 && clickBeat <= evt.start + evt.duration + 0.125) {
+        closestDistance = distance;
+        closestIndex = i;
+      }
+    });
+
+    if (closestIndex !== -1) {
+      const next = events.map((evt, i) =>
+        i === closestIndex ? { ...evt, velocity: clickVelocity } : evt
+      );
+      setSelectedId(String(closestIndex));
+      playPreview(events[closestIndex].pitch, clickVelocity);
+      commit(next);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-apple-bg">
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-apple-border px-3">
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold text-apple-text">{region.name}</span>
           <span className="text-[10px] text-apple-muted">
-            {bpm} BPM · click grid to add, drag notes to move
+            {bpm} BPM · {bars} bars · {keyRoot} {scale} · click grid to add, drag notes to move
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -281,17 +401,23 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-auto">
+      <div
+        ref={gridScrollRef}
+        className="relative min-h-0 flex-1 overflow-auto"
+        onScroll={() => syncScroll('grid')}
+      >
         <div
-          className="relative cursor-crosshair"
+          className={`relative ${
+            toolMode === 'cursor' ? 'cursor-default' : toolMode === 'eraser' ? 'cursor-cell' : 'cursor-crosshair'
+          }`}
           style={{
-            width: TOTAL_BEATS * BEAT_WIDTH,
-            height: (MAX_PITCH - MIN_PITCH + 1) * NOTE_HEIGHT,
+            width: totalBeats * BEAT_WIDTH,
+            height: gridHeight,
           }}
           onClick={handleAdd}
         >
           {/* Grid */}
-          {Array.from({ length: TOTAL_BEATS * 4 }).map((_, i) => (
+          {Array.from({ length: totalBeats * 4 }).map((_, i) => (
             <div
               key={`v-${i}`}
               className="absolute top-0 bottom-0 border-l border-white/5"
@@ -309,17 +435,34 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
           {/* Notes */}
           {events.map((evt, index) => {
             const isSelected = selectedId === String(index);
+            const inScale = isInScale(evt.pitch, keyRoot, scale);
             return (
               <button
                 key={`${evt.pitch}-${evt.start}-${index}`}
                 type="button"
-                onClick={(e) => handleSelect(e, index)}
+                onClick={(e) => {
+                  if (toolMode === 'eraser') {
+                    handleDelete(e, index);
+                  } else {
+                    handleSelect(e, index);
+                  }
+                }}
                 onContextMenu={(e) => handleDelete(e, index)}
-                onPointerDown={(e) => handleNotePointerDown(e, index)}
+                onPointerDown={(e) => {
+                  if (toolMode === 'eraser') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDelete(e, index);
+                  } else {
+                    handleNotePointerDown(e, index);
+                  }
+                }}
                 className={`absolute rounded-sm ring-1 transition ${
                   isSelected
                     ? 'bg-apple-accent ring-white'
-                    : 'bg-apple-accent/70 ring-apple-accent/50 hover:bg-apple-accent'
+                    : inScale
+                    ? 'bg-apple-accent/70 ring-apple-accent/50 hover:bg-apple-accent'
+                    : 'bg-apple-accent/40 ring-apple-accent/30 hover:bg-apple-accent/60'
                 }`}
                 style={{
                   left: evt.start * BEAT_WIDTH,
@@ -335,8 +478,56 @@ export function PianoRoll({ region, bpm = 120, onChange }: PianoRollProps) {
         </div>
       </div>
 
+      <div
+        ref={laneScrollRef}
+        className="relative shrink-0 overflow-x-auto overflow-y-hidden border-t border-apple-border bg-apple-surface-raised"
+        style={{ height: VELOCITY_LANE_HEIGHT }}
+        onScroll={() => syncScroll('lane')}
+      >
+        <div
+          className="relative h-full cursor-crosshair"
+          style={{ width: totalBeats * BEAT_WIDTH }}
+          onClick={handleVelocityLaneClick}
+        >
+          {/* Velocity lane grid */}
+          {Array.from({ length: totalBeats }).map((_, i) => (
+            <div
+              key={`lane-beat-${i}`}
+              className="absolute top-0 bottom-0 border-l border-apple-border/30"
+              style={{ left: i * BEAT_WIDTH }}
+            />
+          ))}
+          <div className="absolute left-0 right-0 top-1/2 border-t border-apple-border/20" />
+
+          {/* Velocity bars */}
+          {events.map((evt, index) => {
+            const isSelected = selectedId === String(index);
+            const barHeight = Math.max(2, (evt.velocity / 127) * VELOCITY_LANE_HEIGHT);
+            return (
+              <button
+                key={`vel-${evt.pitch}-${evt.start}-${index}`}
+                type="button"
+                onPointerDown={(e) => handleVelocityPointerDown(e, index)}
+                className={`absolute bottom-0 rounded-t-sm transition ${
+                  isSelected
+                    ? 'bg-apple-accent ring-1 ring-white'
+                    : 'bg-apple-accent/70 hover:bg-apple-accent'
+                }`}
+                style={{
+                  left: evt.start * BEAT_WIDTH,
+                  width: Math.max(4, evt.duration * BEAT_WIDTH),
+                  height: barHeight,
+                  touchAction: 'none',
+                }}
+                title={`Velocity ${evt.velocity}`}
+              />
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex h-7 shrink-0 items-center border-t border-apple-border bg-apple-surface-raised px-3 text-[10px] text-apple-muted">
-        Click grid to add · Click note to select · Drag to move · Right click to delete · Cmd/Ctrl+Z undo/redo
+        {toolMode === 'pencil' ? 'Click grid to add' : toolMode === 'eraser' ? 'Click note to erase' : 'Click note to select · Drag to move'} · Right click to delete · Drag velocity bars · Cmd/Ctrl+Z undo/redo
       </div>
     </div>
   );

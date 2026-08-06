@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Toolbar } from '@/components/daw/Toolbar';
+import { TransportBar, SnapGrid, ToolMode } from '@/components/daw/TransportBar';
 import { TrackHeaders } from '@/components/daw/TrackHeaders';
 import { Timeline } from '@/components/daw/Timeline';
 import { Inspector } from '@/components/daw/Inspector';
 import { WamPluginModal } from '@/components/daw/WamPluginModal';
+import { AudioSplash } from '@/components/daw/AudioSplash';
 import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
@@ -50,7 +52,7 @@ export default function Home() {
   const [position, setPosition] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [showHints, setShowHints] = useState(true);
+  const [showHints, setShowHints] = useState(false);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [isBackendRendering, setIsBackendRendering] = useState(false);
@@ -59,6 +61,10 @@ export default function Home() {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('piano');
   const [meterLevels, setMeterLevels] = useState<Record<string, number>>({});
   const [wamPluginTrackId, setWamPluginTrackId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isLoopEnabled, setIsLoopEnabled] = useState(false);
+  const [snapGrid, setSnapGrid] = useState<SnapGrid>('1/16');
+  const [toolMode, setToolMode] = useState<ToolMode>('cursor');
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -475,23 +481,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen flex-col bg-apple-bg">
-      <Header />
-
-      <Toolbar
-        prompt={prompt}
-        onPromptChange={setPrompt}
-        onGenerate={handlePromptGenerate}
-        isGenerating={isGenerating}
-        isPlaying={playerState.isPlaying}
-        bpm={dawProject?.bpm ?? 120}
-        key={dawProject?.key ?? 'D'}
-        scale={dawProject?.scale ?? 'minor'}
-        position={formatTime(position)}
-        metronomeEnabled={metronomeEnabled}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onStop={handleStop}
-        onMetronomeToggle={handleToggleMetronome}
+      <Header
         onExportMidi={handleExportMidi}
         onExportWav={handleExportWav}
         onExportRpp={handleExportRpp}
@@ -504,14 +494,35 @@ export default function Home() {
         isBackendRendering={isBackendRendering}
       />
 
-      {!playerState.isReady && !playerState.loading && (
-        <button
-          onClick={handleEnableAudio}
-          className="flex w-full items-center justify-center gap-2 border-b border-apple-border bg-apple-accent/10 px-4 py-2 text-sm font-medium text-apple-accent transition hover:bg-apple-accent/20"
-        >
-          Enable Audio
-        </button>
-      )}
+      <Toolbar
+        prompt={prompt}
+        onPromptChange={setPrompt}
+        onGenerate={handlePromptGenerate}
+        isGenerating={isGenerating}
+      />
+
+      <TransportBar
+        isPlaying={playerState.isPlaying}
+        isRecording={isRecording}
+        isLoopEnabled={isLoopEnabled}
+        metronomeEnabled={metronomeEnabled}
+        bpm={dawProject?.bpm ?? 120}
+        musicalKey={dawProject?.key ?? 'D'}
+        scale={dawProject?.scale ?? 'minor'}
+        position={formatTime(position)}
+        snapGrid={snapGrid}
+        toolMode={toolMode}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onStop={handleStop}
+        onRecordToggle={() => setIsRecording((prev) => !prev)}
+        onLoopToggle={() => setIsLoopEnabled((prev) => !prev)}
+        onMetronomeToggle={handleToggleMetronome}
+        onSnapChange={setSnapGrid}
+        onToolModeChange={setToolMode}
+      />
+
+      {!playerState.isReady && !playerState.loading && <AudioSplash onStart={handleEnableAudio} />}
 
       {showHints && (
         <div className="flex items-start gap-3 border-b border-apple-border bg-apple-surface-raised px-4 py-2 text-sm text-apple-text">
@@ -549,7 +560,7 @@ export default function Home() {
         </div>
       )}
 
-      <main className="flex min-h-0 flex-1">
+      <main className="flex min-h-0 flex-1 divide-x divide-apple-border bg-apple-bg">
         <TrackHeaders
           tracks={dawProject?.tracks ?? []}
           selectedTrackId={selectedTrackId}
@@ -566,6 +577,8 @@ export default function Home() {
               position={position}
               bpm={dawProject?.bpm ?? 120}
               selectedRegionId={selectedRegion?.id}
+              snapGrid={snapGrid}
+              toolMode={toolMode}
               onRegionClick={handleRegionClick}
               onRegionChange={handleRegionChange}
               onRegionDuplicate={handleRegionDuplicate}
@@ -583,6 +596,8 @@ export default function Home() {
             scale={dawProject?.scale ?? 'minor'}
             position={position}
             activeTab={activeBottomTab}
+            snapGrid={snapGrid}
+            toolMode={toolMode}
             onActiveTabChange={setActiveBottomTab}
             onRegionChange={handleRegionChange}
             onTrackChange={handleTrackChange}

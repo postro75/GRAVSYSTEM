@@ -3,6 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* DAW-inspired dark theme. Values are CSS custom properties so the whole
+       UI can be re-themed from one place without touching Tailwind classes. */
+    --apple-bg: #0a0a0c;
+    --apple-surface: #141416;
+    --apple-surface-raised: #1e1e21;
+    --apple-border: #333336;
+    --apple-text: #ffffff;
+    --apple-muted: #a0a0a8;
+    --apple-accent: #2d8cff;
+    --apple-accent-hover: #4fa0ff;
+    --apple-success: #2ecc71;
+    --apple-warning: #f39c12;
+    --apple-danger: #e74c3c;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
