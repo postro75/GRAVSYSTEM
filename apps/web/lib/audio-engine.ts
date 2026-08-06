@@ -24,7 +24,7 @@ import {
   clampInstrumentParams,
   type InstrumentParams,
 } from './instrument-params';
-import { loadSynth101, WamInstrument } from './wam-host';
+import { loadWamPlugin, WamInstrument } from './wam-host';
 
 export interface AudioEngineState {
   isPlaying: boolean;
@@ -360,7 +360,8 @@ export class AudioEngine {
 
     if (def.type === 'wam') {
       const context = Tone.context.rawContext as AudioContext;
-      const wam = await loadSynth101(context);
+      const pluginId = def.config === 'synth101' || def.config === 'modal' ? def.config : 'synth101';
+      const wam = await loadWamPlugin(pluginId, context);
       (wam.output as unknown as AudioNode).connect(channel.gain as unknown as AudioNode);
       return wam;
     }
@@ -726,6 +727,11 @@ export class AudioEngine {
     if (!track || !this.project) return;
     track.automation = points;
     this.scheduleAutomation(this.project);
+  }
+
+  /** Get the loaded instrument for a track (useful for WAM GUI access). */
+  getInstrument(trackId: string): PlayableInstrument | undefined {
+    return this.instruments.get(trackId);
   }
 
   /** Toggle whether a track participates in kick-driven side-chain ducking. */

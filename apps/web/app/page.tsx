@@ -6,6 +6,7 @@ import { Toolbar } from '@/components/daw/Toolbar';
 import { TrackHeaders } from '@/components/daw/TrackHeaders';
 import { Timeline } from '@/components/daw/Timeline';
 import { Inspector } from '@/components/daw/Inspector';
+import { WamPluginModal } from '@/components/daw/WamPluginModal';
 import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
@@ -15,6 +16,7 @@ import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
 import { downloadRpp } from '@/lib/rpp-export';
 import { renderProjectToWav, downloadWav } from '@/lib/audio-export';
+import { renderProjectOnBackend, downloadRenderResult } from '@/lib/render-client';
 import { generateProject } from '@/lib/generator';
 import {
   loadProjects,
@@ -51,10 +53,12 @@ export default function Home() {
   const [showHints, setShowHints] = useState(true);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [isBackendRendering, setIsBackendRendering] = useState(false);
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('piano');
   const [meterLevels, setMeterLevels] = useState<Record<string, number>>({});
+  const [wamPluginTrackId, setWamPluginTrackId] = useState<string | null>(null);
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -271,6 +275,23 @@ export default function Home() {
     }
   };
 
+  const handleBackendRender = async () => {
+    if (!dawProject) return;
+    setIsBackendRendering(true);
+    setError(null);
+    try {
+      const result = await renderProjectOnBackend(dawProject);
+      downloadRenderResult(result);
+      if (result.type === 'midi') {
+        setError(`Backend render fallback: ${result.diagnostic}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Backend render failed');
+    } finally {
+      setIsBackendRendering(false);
+    }
+  };
+
   const handleToggleMetronome = () => {
     const next = !metronomeEnabled;
     setMetronomeEnabled(next);
@@ -438,7 +459,19 @@ export default function Home() {
     setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
   };
 
+  const handleOpenWamGui = (trackId: string) => {
+    setWamPluginTrackId(trackId);
+  };
+
   const selectedTrack = dawProject?.tracks.find((t) => t.id === selectedTrackId) ?? null;
+  const wamPluginInstrument = wamPluginTrackId
+    ? (playerRef.current?.getInstrument(wamPluginTrackId) as import('@/lib/wam-host').WamInstrument | undefined)
+    : null;
+  const wamPluginName = wamPluginTrackId
+    ? (getInstrumentById(
+        dawProject?.tracks.find((t) => t.id === wamPluginTrackId)?.instrument ?? ''
+      )?.name ?? 'WAM Plugin')
+    : 'WAM Plugin';
 
   return (
     <div className="flex h-screen flex-col bg-apple-bg">
@@ -465,8 +498,10 @@ export default function Home() {
         onExportJson={handleExportJson}
         onImportJson={handleImportJson}
         onOpenProjects={() => setIsProjectManagerOpen(true)}
+        onRenderBackend={handleBackendRender}
         canExport={!!dawProject}
         isRendering={isRendering}
+        isBackendRendering={isBackendRendering}
       />
 
       {!playerState.isReady && !playerState.loading && (
@@ -581,6 +616,14 @@ export default function Home() {
           onInstrumentParamsChange={handleInstrumentParamsChange}
           onInsertEffectsChange={handleInsertEffectsChange}
           onSidechainChange={handleSidechainChange}
+          onOpenWamGui={handleOpenWamGui}
+        />
+
+        <WamPluginModal
+          instrument={wamPluginInstrument ?? null}
+          pluginName={wamPluginName}
+          isOpen={!!wamPluginTrackId}
+          onClose={() => setWamPluginTrackId(null)}
         />
       </main>
 

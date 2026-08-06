@@ -24,6 +24,7 @@ export interface InspectorProps {
   onInstrumentParamsChange?: (trackId: string, params: import('@gravsystem/core').InstrumentParams) => void;
   onInsertEffectsChange?: (trackId: string, effects: import('@gravsystem/core').InsertEffects) => void;
   onSidechainChange?: (trackId: string, sidechain: boolean) => void;
+  onOpenWamGui?: (trackId: string) => void;
 }
 
 function InfoRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
@@ -47,6 +48,7 @@ export function Inspector({
   onInstrumentParamsChange,
   onInsertEffectsChange,
   onSidechainChange,
+  onOpenWamGui,
 }: InspectorProps) {
   const style = selectedTrack ? trackStyle(selectedTrack.name) : null;
   const Icon = style?.icon;
@@ -102,6 +104,14 @@ export function Inspector({
                   className="h-4 w-4 accent-apple-accent"
                 />
               </label>
+            )}
+            {selectedTrack.instrumentType === 'wam' && onOpenWamGui && (
+              <button
+                onClick={() => onOpenWamGui(selectedTrack.id)}
+                className="mt-2 w-full rounded-apple-sm border border-apple-border bg-apple-surface px-2 py-1.5 text-xs font-medium text-apple-text transition hover:bg-apple-surface-raised"
+              >
+                Open Plugin UI
+              </button>
             )}
           </div>
         )}

@@ -85,15 +85,26 @@ export const INSTRUMENTS: InstrumentDefinition[] = [
 ];
 
 if (WAM_ENABLED) {
-  INSTRUMENTS.push({
-    id: 'wam-synth101',
-    name: 'Synth-101 (WAM)',
-    category: 'lead',
-    type: 'wam',
-    config: 'synth101',
-    color: '#a855f7',
-    description: 'Real WAM plugin: Roland SH-101 clone (experimental)',
-  });
+  INSTRUMENTS.push(
+    {
+      id: 'wam-synth101',
+      name: 'Synth-101 (WAM)',
+      category: 'lead',
+      type: 'wam',
+      config: 'synth101',
+      color: '#a855f7',
+      description: 'Real WAM plugin: Roland SH-101 clone (experimental)',
+    },
+    {
+      id: 'wam-modal',
+      name: 'Spectrum: Modal (WAM)',
+      category: 'pad',
+      type: 'wam',
+      config: 'modal',
+      color: '#8b5cf6',
+      description: 'Real WAM plugin: polyphonic modal synthesizer (experimental)',
+    }
+  );
 }
 
 export function getInstrumentById(id: string): InstrumentDefinition | undefined {
@@ -124,8 +135,8 @@ export const STYLE_INSTRUMENT_PALETTE: Record<
 > = {
   jarre: {
     bass: ['jarre-bass', 'jarre-bass-seq'],
-    lead: ['jarre-lead', 'jarre-brass'],
-    pad: ['jarre-pad', 'string-pad', 'choir-pad'],
+    lead: ['jarre-lead', 'jarre-brass', ...(WAM_ENABLED ? ['wam-synth101'] : [])],
+    pad: ['jarre-pad', 'string-pad', 'choir-pad', ...(WAM_ENABLED ? ['wam-modal'] : [])],
     arp: ['jarre-arp', 'fm-arp'],
     chords: ['jarre-chords', 'square-chords'],
     drums: ['synth-drums', 'sample-drums'],
@@ -133,8 +144,8 @@ export const STYLE_INSTRUMENT_PALETTE: Record<
   },
   ambient: {
     bass: ['jarre-bass'],
-    lead: ['jarre-lead'],
-    pad: ['jarre-pad', 'choir-pad', 'string-pad'],
+    lead: ['jarre-lead', ...(WAM_ENABLED ? ['wam-synth101'] : [])],
+    pad: ['jarre-pad', 'choir-pad', 'string-pad', ...(WAM_ENABLED ? ['wam-modal'] : [])],
     arp: ['jarre-arp', 'fm-arp'],
     chords: ['jarre-chords'],
     drums: ['sample-drums', 'synth-drums'],
@@ -142,8 +153,8 @@ export const STYLE_INSTRUMENT_PALETTE: Record<
   },
   synthwave: {
     bass: ['kavinsky-bass', 'synthwave-bass'],
-    lead: ['kavinsky-lead', 'synthwave-lead'],
-    pad: ['kavinsky-pad', 'warm-pad', 'string-pad'],
+    lead: ['kavinsky-lead', 'synthwave-lead', ...(WAM_ENABLED ? ['wam-synth101'] : [])],
+    pad: ['kavinsky-pad', 'warm-pad', 'string-pad', ...(WAM_ENABLED ? ['wam-modal'] : [])],
     arp: ['kavinsky-arp', 'pluck-arp', 'fm-arp'],
     chords: ['square-chords', 'jarre-chords'],
     drums: ['synth-drums', 'sample-drums'],
@@ -195,7 +206,10 @@ export function inferInstrumentForTrack(trackName: string, style = 'dance'): str
 
   if (palette && palette.length > 0) {
     const rng = mulberry32(trackName.length * 31 + s.length * 17 + 42);
-    return palette[Math.floor(rng() * palette.length)];
+    const wamOptions = WAM_ENABLED ? palette.filter((id) => id.startsWith('wam-')) : [];
+    const useWam = wamOptions.length > 0 && rng() < 0.35;
+    const pool = useWam ? wamOptions : palette;
+    return pool[Math.floor(rng() * pool.length)];
   }
 
   // Fallback to the previous heuristic for unstyled categories.

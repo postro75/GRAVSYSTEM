@@ -13,6 +13,7 @@ import {
   Loader2,
   Music2,
   Mic,
+  Server,
 } from 'lucide-react';
 
 export interface ToolbarProps {
@@ -36,8 +37,10 @@ export interface ToolbarProps {
   onExportJson?: () => void;
   onImportJson?: (file: File) => void;
   onOpenProjects?: () => void;
+  onRenderBackend?: () => void;
   canExport?: boolean;
   isRendering?: boolean;
+  isBackendRendering?: boolean;
 }
 
 export function Toolbar({
@@ -61,8 +64,10 @@ export function Toolbar({
   onExportJson,
   onImportJson,
   onOpenProjects,
+  onRenderBackend,
   canExport = false,
   isRendering = false,
+  isBackendRendering = false,
 }: ToolbarProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -208,6 +213,17 @@ export function Toolbar({
                 >
                   {isRendering ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                   Export WAV
+                </button>
+                <button
+                  onClick={() => {
+                    onRenderBackend?.();
+                    setShowExportMenu(false);
+                  }}
+                  disabled={isBackendRendering}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-apple-text transition hover:bg-white/5 disabled:opacity-40"
+                >
+                  {isBackendRendering ? <Loader2 size={14} className="animate-spin" /> : <Server size={14} />}
+                  Render WAV (backend)
                 </button>
                 <div className="my-1 h-px bg-apple-border" />
                 <button
