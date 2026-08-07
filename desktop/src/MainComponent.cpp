@@ -4,8 +4,6 @@ MainComponent::MainComponent()
 {
     addAndMakeVisible (playButton);
     addAndMakeVisible (stopButton);
-    addAndMakeVisible (scanVst3Button);
-    addAndMakeVisible (loadB3Button);
     addAndMakeVisible (infoLabel);
 
     playButton.onClick = [this]
@@ -19,6 +17,10 @@ MainComponent::MainComponent()
         audioEngine.stopTransport();
         logToInfoLabel ("Stopped");
     };
+
+#if GRAVSYSTEM_ENABLE_VST3
+    addAndMakeVisible (scanVst3Button);
+    addAndMakeVisible (loadB3Button);
 
     scanVst3Button.onClick = [this]
     {
@@ -39,7 +41,11 @@ MainComponent::MainComponent()
         });
     };
 
-    infoLabel.setText ("GRAVSYSTEM Desktop — audio engine ready", juce::dontSendNotification);
+    infoLabel.setText ("GRAVSYSTEM Desktop — audio engine + VST3 host ready", juce::dontSendNotification);
+#else
+    infoLabel.setText ("GRAVSYSTEM Desktop — audio engine ready (VST3 disabled)", juce::dontSendNotification);
+#endif
+
     setSize (1400, 900);
 }
 
@@ -59,10 +65,14 @@ void MainComponent::resized()
     transport.removeFromLeft (8);
     stopButton.setBounds (transport.removeFromLeft (80));
     transport.removeFromLeft (16);
+
+#if GRAVSYSTEM_ENABLE_VST3
     scanVst3Button.setBounds (transport.removeFromLeft (110));
     transport.removeFromLeft (8);
     loadB3Button.setBounds (transport.removeFromLeft (110));
     transport.removeFromLeft (16);
+#endif
+
     infoLabel.setBounds (transport);
 }
 
