@@ -53,7 +53,7 @@ private:
         bool isDrum = false;
         double frequency = 440.0;
         double phase = 0.0;
-        double amplitude = 0.0;
+        float amplitude = 0.0f;
         double pan = 0.0;
 
         int ageSamples = 0;

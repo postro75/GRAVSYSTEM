@@ -244,7 +244,7 @@ void AudioEngine::triggerEvent (const gravsystem::Track& track,
     voice.active = true;
     voice.isDrum = isDrum;
     voice.frequency = midiNoteToFrequency (note);
-    voice.amplitude = juce::jmap (static_cast<double> (event.velocity), 0.0, 127.0, 0.0, 0.25);
+    voice.amplitude = juce::jmap (static_cast<float> (event.velocity), 0.0f, 127.0f, 0.0f, 0.25f);
     voice.pan = track.pan;
     voice.durationSamples = static_cast<int> (event.durationBeats * sampleRate * 60.0 / bpm.load());
 
