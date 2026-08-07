@@ -1,5 +1,25 @@
 #include <JuceHeader.h>
 #include "MainComponent.h"
+#include "AudioEngine.h"
+#include "ProjectModel.h"
+#include <iostream>
+
+namespace
+{
+    juce::StringArray parseCommandLine (const juce::String& commandLine)
+    {
+        return juce::StringArray::fromTokens (commandLine, true);
+    }
+
+    int findRenderFlagIndex (const juce::StringArray& args)
+    {
+        for (int i = 0; i < args.size(); ++i)
+            if (args[i] == "--render-to-wav")
+                return i;
+
+        return -1;
+    }
+}
 
 class GRAVSYSTEMApplication : public juce::JUCEApplication
 {
@@ -12,6 +32,47 @@ public:
 
     void initialise (const juce::String& commandLine) override
     {
+        auto args = parseCommandLine (commandLine);
+        const auto renderIndex = findRenderFlagIndex (args);
+
+        if (renderIndex >= 0 && renderIndex + 2 < args.size())
+        {
+            juce::File projectFile (args[renderIndex + 2]);
+            juce::File outputFile (args[renderIndex + 1]);
+
+            if (! projectFile.existsAsFile())
+            {
+                std::cerr << "Project file not found: " << projectFile.getFullPathName().toStdString() << std::endl;
+                quit();
+                return;
+            }
+
+            gravsystem::ProjectModel model;
+            auto error = model.loadFromJson (projectFile.loadFileAsString());
+
+            if (error.isNotEmpty())
+            {
+                std::cerr << "Failed to load project: " << error.toStdString() << std::endl;
+                quit();
+                return;
+            }
+
+            AudioEngine engine (&model);
+            error = engine.renderToFile (outputFile, 8.0);
+
+            if (error.isNotEmpty())
+            {
+                std::cerr << "Render failed: " << error.toStdString() << std::endl;
+            }
+            else
+            {
+                std::cout << "Rendered: " << outputFile.getFullPathName().toStdString() << std::endl;
+            }
+
+            quit();
+            return;
+        }
+
         mainWindow.reset (new MainWindow (getApplicationName(), commandLine));
     }
 

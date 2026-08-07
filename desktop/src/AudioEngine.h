@@ -24,6 +24,10 @@ public:
     double getBpm() const;
     void setBpm (double newBpm);
 
+    /** Render the loaded project offline to a WAV file for the given duration.
+        Returns an empty string on success, or an error message. */
+    juce::String renderToFile (const juce::File& outputFile, double seconds);
+
 private:
     void audioDeviceIOCallbackWithContext (const float* const* inputChannelData,
                                            int numInputChannels,

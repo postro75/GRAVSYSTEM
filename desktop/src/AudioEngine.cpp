@@ -1,10 +1,23 @@
 #include "AudioEngine.h"
+#include <iostream>
 
 AudioEngine::AudioEngine (gravsystem::ProjectModel* model)
     : projectModel (model)
 {
     auto result = deviceManager.initialise (0, 2, nullptr, true);
     juce::ignoreUnused (result);
+
+    if (auto* device = deviceManager.getCurrentAudioDevice())
+    {
+        std::cout << "[AudioEngine] Device: " << device->getName().toStdString()
+                  << " @ " << device->getCurrentSampleRate() << " Hz"
+                  << " (buffer: " << device->getCurrentBufferSizeSamples() << " samples)" << std::endl;
+    }
+    else
+    {
+        std::cout << "[AudioEngine] No audio device available" << std::endl;
+    }
+
     deviceManager.addAudioCallback (this);
 }
 
@@ -244,7 +257,7 @@ void AudioEngine::triggerEvent (const gravsystem::Track& track,
     voice.active = true;
     voice.isDrum = isDrum;
     voice.frequency = midiNoteToFrequency (note);
-    voice.amplitude = juce::jmap (static_cast<float> (event.velocity), 0.0f, 127.0f, 0.0f, 0.25f);
+    voice.amplitude = juce::jmap (static_cast<float> (event.velocity), 0.0f, 127.0f, 0.0f, 0.6f);
     voice.pan = track.pan;
     voice.durationSamples = static_cast<int> (event.durationBeats * sampleRate * 60.0 / bpm.load());
 
@@ -334,4 +347,57 @@ float AudioEngine::envelopeForVoice (const Voice& voice)
     }
 
     return 0.0f;
+}
+
+juce::String AudioEngine::renderToFile (const juce::File& outputFile, double seconds)
+{
+    if (projectModel == nullptr || ! projectModel->isLoaded())
+        return "No project loaded";
+
+    const auto channels = 2;
+    const auto totalSamples = static_cast<int> (seconds * sampleRate);
+
+    if (totalSamples <= 0)
+        return "Invalid render duration";
+
+    juce::AudioBuffer<float> buffer (channels, totalSamples);
+    buffer.clear();
+
+    stopTransport();
+    playing = true;
+    currentSample = 0;
+
+    constexpr int blockSize = 512;
+
+    for (int offset = 0; offset < totalSamples; offset += blockSize)
+    {
+        const auto samplesThisBlock = juce::jmin (blockSize, totalSamples - offset);
+        float* channelPointers[2] = { buffer.getWritePointer (0, offset),
+                                      channels > 1 ? buffer.getWritePointer (1, offset) : nullptr };
+
+        processBlock (channelPointers, channels, samplesThisBlock);
+    }
+
+    stopTransport();
+
+    outputFile.deleteFile();
+    auto fileStream = std::make_unique<juce::FileOutputStream> (outputFile);
+
+    if (fileStream == nullptr || ! fileStream->openedOk())
+        return "Could not open output file";
+
+    juce::WavAudioFormat wavFormat;
+    std::unique_ptr<juce::AudioFormatWriter> writer (wavFormat.createWriterFor (fileStream.get(),
+                                                                                 sampleRate,
+                                                                                 static_cast<unsigned int> (channels),
+                                                                                 16,
+                                                                                 {},
+                                                                                 0));
+
+    if (writer == nullptr)
+        return "Could not create WAV writer";
+
+    fileStream.release();
+    writer->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+    return {};
 }
