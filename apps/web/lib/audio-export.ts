@@ -167,7 +167,7 @@ export async function renderProjectToWav(project: Project): Promise<Blob> {
     for (const track of project.tracks) {
       const notes: ScheduledNote[] = track.regions.flatMap((region) =>
         region.midiEvents.map((evt) => ({
-          time: (evt.start / project.bpm) * 60,
+          time: ((region.startBeat + evt.start) / project.bpm) * 60,
           note: evt.pitch,
           duration: Math.max(0.01, (evt.duration / project.bpm) * 60),
           velocity: evt.velocity / 127,
