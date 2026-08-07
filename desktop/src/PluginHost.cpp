@@ -90,12 +90,12 @@ void PluginHost::loadB3Plugin (std::function<void (juce::AudioPluginInstance*, c
         return;
     }
 
-    auto* format = formatManager.findFormatForFileDescription (*b3Desc);
+    auto* format = findVst3Format (formatManager);
 
     if (format == nullptr)
     {
         if (callback)
-            callback (nullptr, "No format available for the B3 plugin.");
+            callback (nullptr, "VST3 format is not available for loading the B3 plugin.");
         return;
     }
 
