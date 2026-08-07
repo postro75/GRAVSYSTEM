@@ -45,10 +45,8 @@ set(GRAVSYSTEM_JUCE_MODULES
   juce::juce_events
   juce::juce_graphics
   juce::juce_gui_basics
-  juce::juce_gui_extra
   juce::juce_audio_basics
   juce::juce_audio_devices
-  juce::juce_audio_formats
   juce::juce_audio_utils
 )
 
