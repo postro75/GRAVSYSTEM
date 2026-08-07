@@ -87,21 +87,23 @@ export function BottomPanel({
   return (
     <div className="flex h-80 shrink-0 flex-col border-t border-apple-border bg-apple-surface">
       {/* Tabs */}
-      <div className="flex h-9 shrink-0 items-center border-b border-apple-border bg-apple-surface-raised">
+      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-apple-border bg-apple-surface-raised px-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex h-full items-center gap-2 border-b-2 px-4 text-xs font-medium transition ${
-                activeTab === tab.id
-                  ? 'border-apple-accent text-apple-accent'
-                  : 'border-transparent text-apple-muted hover:text-apple-text'
+              className={`flex h-6 items-center gap-1.5 rounded px-2.5 text-[11px] font-medium transition ${
+                isActive
+                  ? 'bg-apple-accent text-white shadow-sm'
+                  : 'text-apple-muted hover:bg-white/5 hover:text-apple-text'
               }`}
+              title={tab.label}
             >
-              <Icon size={14} />
-              {tab.label}
+              <Icon size={13} />
+              <span>{tab.label}</span>
             </button>
           );
         })}

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Track, Region } from '@gravsystem/core';
 import { ZoomIn, ZoomOut, MoveHorizontal, Copy, Trash2 } from 'lucide-react';
-import { trackStyle } from '@/lib/track-styles';
+import { trackStyle, TRACK_ROW_HEIGHT } from '@/lib/track-styles';
 import { SnapGrid, ToolMode } from './TransportBar';
 
 export interface TimelineProps {
@@ -33,7 +33,7 @@ export function Timeline({
   onRegionDuplicate,
   onRegionDelete,
 }: TimelineProps) {
-  const [beatWidth, setBeatWidth] = useState(48);
+  const [beatWidth, setBeatWidth] = useState(56);
   const [draggingRegion, setDraggingRegion] = useState<{
     id: string;
     startBeat: number;
@@ -53,8 +53,8 @@ export function Timeline({
     mode: 'move' | 'resize';
   } | null>(null);
 
-  const minBeatWidth = 24;
-  const maxBeatWidth = 120;
+  const minBeatWidth = 28;
+  const maxBeatWidth = 140;
 
   const snapStep = snapGrid === 'off' ? 0.015625 : 1 / Number(snapGrid.split('/')[1]);
 
@@ -127,7 +127,7 @@ export function Timeline({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => handleZoom(-8)}
+            onClick={() => handleZoom(-10)}
             className="rounded p-1 text-apple-muted transition hover:bg-white/10"
             title="Zoom out"
           >
@@ -135,7 +135,7 @@ export function Timeline({
           </button>
           <button
             type="button"
-            onClick={() => handleZoom(8)}
+            onClick={() => handleZoom(10)}
             className="rounded p-1 text-apple-muted transition hover:bg-white/10"
             title="Zoom in"
           >
@@ -145,7 +145,7 @@ export function Timeline({
       </div>
 
       {/* Ruler */}
-      <div className="flex h-8 shrink-0 overflow-hidden border-b border-apple-border bg-apple-surface-raised">
+      <div className="flex h-9 shrink-0 overflow-hidden border-b border-apple-border bg-apple-surface-raised">
         <div
           ref={containerRef}
           className="relative h-full"
@@ -158,17 +158,19 @@ export function Timeline({
               <div
                 key={i}
                 className={`absolute top-0 bottom-0 border-l ${
-                  isBar ? 'border-apple-border' : 'border-apple-border/40'
+                  isBar ? 'border-apple-text/40' : 'border-apple-border/40'
                 }`}
                 style={{ left: i * beatWidth }}
               >
-                <span
-                  className={`ml-1 select-none text-[10px] ${
-                    isBar ? 'font-semibold text-apple-text' : 'text-apple-muted'
-                  }`}
-                >
-                  {isBar ? i / 4 + 1 : beatInBar}
-                </span>
+                {isBar ? (
+                  <span className="ml-1.5 select-none pt-1 text-[11px] font-bold tabular-nums text-apple-text">
+                    {i / 4 + 1}
+                  </span>
+                ) : (
+                  <span className="ml-1 select-none text-[9px] tabular-nums text-apple-muted/70">
+                    {beatInBar}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -183,19 +185,24 @@ export function Timeline({
           </div>
         ) : (
           <div style={{ width: totalBeats * beatWidth }}>
-            {tracks.map((track) => {
+            {tracks.map((track, trackIndex) => {
               const style = trackStyle(track.name);
+              const isEven = trackIndex % 2 === 0;
               return (
                 <div
                   key={track.id}
-                  className="group relative h-28 border-b border-apple-border transition hover:bg-white/[0.02]"
+                  className="group relative border-b border-apple-border transition"
+                  style={{
+                    height: TRACK_ROW_HEIGHT,
+                    backgroundColor: isEven ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.04)',
+                  }}
                 >
                   {/* Background beat grid */}
                   {Array.from({ length: totalBeats }).map((_, i) => (
                     <div
                       key={i}
                       className={`absolute top-0 bottom-0 border-l ${
-                        i % 4 === 0 ? 'border-apple-border/30' : 'border-apple-border/10'
+                        i % 4 === 0 ? 'border-apple-border/50' : 'border-apple-border/15'
                       }`}
                       style={{ left: i * beatWidth }}
                     />
@@ -208,13 +215,17 @@ export function Timeline({
                     return (
                       <div
                         key={region.id}
-                        className={`absolute top-1.5 bottom-1.5 cursor-grab overflow-hidden rounded border transition active:cursor-grabbing ${
-                          isSelected ? 'border-white/80 shadow-lg' : 'border-white/15'
+                        className={`absolute cursor-grab overflow-hidden rounded-sm border-2 transition active:cursor-grabbing ${
+                          isSelected
+                            ? 'border-white shadow-[0_0_0_1px_rgba(255,255,255,0.25)]'
+                            : 'border-white/30 hover:border-white/60'
                         }`}
                         style={{
                           left: visual.startBeat * beatWidth,
                           width: Math.max(4, visual.duration * beatWidth),
-                          backgroundColor: isSelected ? `${style.color}45` : `${style.color}28`,
+                          top: 8,
+                          bottom: 8,
+                          backgroundColor: isSelected ? `${style.color}35` : `${style.color}1f`,
                         }}
                         onClick={() => {
                           if (toolMode === 'eraser') {
@@ -236,12 +247,17 @@ export function Timeline({
                       >
                         {/* Track-colour header strip */}
                         <div
-                          className="h-2 w-full border-b border-white/10"
+                          className="flex h-5 items-center border-b border-white/10 px-2"
                           style={{ backgroundColor: style.color }}
-                        />
-                        <div className="flex items-center justify-between px-2 py-1.5">
-                          <div className="truncate text-[10px] font-semibold text-white">
+                        >
+                          <span className="truncate text-[10px] font-bold text-white drop-shadow">
                             {region.name}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between px-2 py-1">
+                          <div className="truncate text-[10px] font-medium text-white/90">
+                            {noteCount} note{noteCount !== 1 ? 's' : ''}
                           </div>
                           <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
                             <button
@@ -264,19 +280,16 @@ export function Timeline({
                                 e.stopPropagation();
                                 onRegionDelete?.(region);
                               }}
-                              className="rounded p-0.5 text-apple-danger hover:bg-white/20"
+                              className="rounded p-0.5 text-white/90 hover:bg-apple-danger hover:text-white"
                             >
                               <Trash2 size={10} />
                             </button>
                           </div>
                         </div>
-                        <div className="px-2 text-[9px] text-white/70">
-                          {noteCount} note{noteCount !== 1 ? 's' : ''}
-                        </div>
 
                         {/* Resize handle */}
                         <div
-                          className="absolute top-0 right-0 bottom-0 w-2 cursor-e-resize bg-white/20 opacity-0 transition hover:opacity-100"
+                          className="absolute top-0 right-0 bottom-0 w-2.5 cursor-e-resize bg-white/30 opacity-0 transition hover:opacity-100"
                           onPointerDown={(e) => {
                             e.stopPropagation();
                             handlePointerDown(e, track, region, 'resize');
@@ -294,7 +307,7 @@ export function Timeline({
         {/* Playback cursor */}
         {tracks.length > 0 && (
           <div
-            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-apple-accent shadow-[0_0_8px_rgba(45,140,255,0.8)]"
+            className="pointer-events-none absolute top-0 bottom-0 z-20 w-px bg-apple-accent shadow-[0_0_10px_rgba(14,165,233,0.9)]"
             style={{ left: positionBeats * beatWidth }}
           >
             <div className="absolute -top-1 -left-1.5 h-0 w-0 border-l-[6px] border-r-[6px] border-t-[8px] border-l-transparent border-r-transparent border-t-apple-accent" />

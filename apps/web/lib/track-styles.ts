@@ -19,6 +19,9 @@ export interface TrackStyle {
   icon: LucideIcon;
 }
 
+/** Shared track lane / header row height in pixels. Keep in sync with Timeline and TrackHeaders. */
+export const TRACK_ROW_HEIGHT = 96;
+
 const TRACK_STYLES: Record<string, TrackStyle> = {
   drums: { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', icon: Drum },
   kick: { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', icon: Drum },
