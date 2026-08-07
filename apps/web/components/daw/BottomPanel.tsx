@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Track, Region } from '@gravsystem/core';
 import { PianoRoll } from './PianoRoll';
+import { DrumStepSequencer } from './DrumStepSequencer';
 import { Mixer } from './Mixer';
 import { ChordPad } from './ChordPad';
 import { StepSequencer } from './StepSequencer';
@@ -12,6 +13,17 @@ import { Piano, SlidersHorizontal, Music, Grid3X3, Keyboard, Activity } from 'lu
 import { SnapGrid, ToolMode } from './TransportBar';
 
 export type BottomTab = 'piano' | 'mixer' | 'chords' | 'sequencer' | 'keyboard' | 'automation';
+
+function isDrumTrack(track?: Track): boolean {
+  if (!track) return false;
+  if (track.instrumentType === 'drums') return true;
+  return /drum|kick|snare|hat|clap/i.test(track.name);
+}
+
+function findTrackForRegion(tracks: Track[], region?: Region | null): Track | undefined {
+  if (!region) return undefined;
+  return tracks.find((t) => t.regions.some((r) => r.id === region.id));
+}
 
 export interface BottomPanelProps {
   tracks: Track[];
@@ -98,16 +110,37 @@ export function BottomPanel({
       {/* Content */}
       <div className="min-h-0 flex-1">
         {activeTab === 'piano' && selectedRegion && (
-          <PianoRoll
-            region={selectedRegion}
-            bpm={bpm}
-            bars={bars}
-            keyRoot={keyRoot}
-            scale={scale}
-            snapGrid={snapGrid}
-            toolMode={toolMode}
-            onChange={onRegionChange}
-          />
+          (() => {
+            const track = findTrackForRegion(tracks, selectedRegion);
+            if (isDrumTrack(track)) {
+              return (
+                <DrumStepSequencer
+                  track={track!}
+                  region={selectedRegion}
+                  bars={bars}
+                  bpm={bpm}
+                  key={keyRoot}
+                  scale={scale}
+                  onRegionChange={onRegionChange}
+                  onPreviewNote={(pitch, velocity) => {
+                    if (selectedTrackId) onPreviewNote?.(selectedTrackId, pitch, velocity);
+                  }}
+                />
+              );
+            }
+            return (
+              <PianoRoll
+                region={selectedRegion}
+                bpm={bpm}
+                bars={bars}
+                keyRoot={keyRoot}
+                scale={scale}
+                snapGrid={snapGrid}
+                toolMode={toolMode}
+                onChange={onRegionChange}
+              />
+            );
+          })()
         )}
         {activeTab === 'piano' && !selectedRegion && (
           <div className="flex h-full items-center justify-center text-xs text-apple-muted">
