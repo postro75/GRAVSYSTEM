@@ -153,6 +153,7 @@ export function Timeline({
         >
           {Array.from({ length: totalBeats }).map((_, i) => {
             const isBar = i % 4 === 0;
+            const beatInBar = (i % 4) + 1;
             return (
               <div
                 key={i}
@@ -161,9 +162,13 @@ export function Timeline({
                 }`}
                 style={{ left: i * beatWidth }}
               >
-                {isBar && (
-                  <span className="ml-1 text-[10px] text-apple-muted">{i / 4 + 1}</span>
-                )}
+                <span
+                  className={`ml-1 select-none text-[10px] ${
+                    isBar ? 'font-semibold text-apple-text' : 'text-apple-muted'
+                  }`}
+                >
+                  {isBar ? i / 4 + 1 : beatInBar}
+                </span>
               </div>
             );
           })}
@@ -183,7 +188,7 @@ export function Timeline({
               return (
                 <div
                   key={track.id}
-                  className="group relative h-20 border-b border-apple-border transition hover:bg-white/[0.02]"
+                  className="group relative h-28 border-b border-apple-border transition hover:bg-white/[0.02]"
                 >
                   {/* Background beat grid */}
                   {Array.from({ length: totalBeats }).map((_, i) => (
@@ -203,13 +208,13 @@ export function Timeline({
                     return (
                       <div
                         key={region.id}
-                        className={`absolute top-2 bottom-2 cursor-grab overflow-hidden rounded border transition active:cursor-grabbing ${
-                          isSelected ? 'border-white/80 shadow-lg' : 'border-white/10'
+                        className={`absolute top-1.5 bottom-1.5 cursor-grab overflow-hidden rounded border transition active:cursor-grabbing ${
+                          isSelected ? 'border-white/80 shadow-lg' : 'border-white/15'
                         }`}
                         style={{
                           left: visual.startBeat * beatWidth,
                           width: Math.max(4, visual.duration * beatWidth),
-                          backgroundColor: isSelected ? `${style.color}55` : `${style.color}35`,
+                          backgroundColor: isSelected ? `${style.color}45` : `${style.color}28`,
                         }}
                         onClick={() => {
                           if (toolMode === 'eraser') {
@@ -229,7 +234,12 @@ export function Timeline({
                           }
                         }}
                       >
-                        <div className="flex items-center justify-between px-2 py-1">
+                        {/* Track-colour header strip */}
+                        <div
+                          className="h-2 w-full border-b border-white/10"
+                          style={{ backgroundColor: style.color }}
+                        />
+                        <div className="flex items-center justify-between px-2 py-1.5">
                           <div className="truncate text-[10px] font-semibold text-white">
                             {region.name}
                           </div>
