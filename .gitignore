@@ -15,4 +15,5 @@ release/
 apps/web/release/
 apps/web/dist/
 desktop/build/
+desktop/build-vst3/
 apps/api/uv.lock
