@@ -10,9 +10,9 @@ public:
     const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
     bool moreThanOneInstanceAllowed() override             { return true; }
 
-    void initialise (const juce::String& /*commandLine*/) override
+    void initialise (const juce::String& commandLine) override
     {
-        mainWindow.reset (new MainWindow (getApplicationName()));
+        mainWindow.reset (new MainWindow (getApplicationName(), commandLine));
     }
 
     void shutdown() override
@@ -30,17 +30,26 @@ public:
     class MainWindow : public juce::DocumentWindow
     {
     public:
-        explicit MainWindow (juce::String name)
+        explicit MainWindow (juce::String name, const juce::String& commandLine)
             : DocumentWindow (name,
                               juce::Desktop::getInstance().getDefaultLookAndFeel()
                                                           .findColour (ResizableWindow::backgroundColourId),
                               DocumentWindow::allButtons)
         {
             setUsingNativeTitleBar (true);
-            setContentOwned (new MainComponent(), true);
+            auto* mainComponent = new MainComponent();
+            setContentOwned (mainComponent, true);
             setResizable (true, true);
             centreWithSize (1400, 900);
             setVisible (true);
+
+            if (commandLine.trim().isNotEmpty())
+            {
+                juce::File projectFile (commandLine.trim());
+
+                if (projectFile.existsAsFile())
+                    mainComponent->loadProjectFile (projectFile);
+            }
         }
 
         void closeButtonPressed() override

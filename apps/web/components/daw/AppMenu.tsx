@@ -11,6 +11,7 @@ export interface AppMenuProps {
   onExportWav?: () => void;
   onExportRpp?: () => void;
   onExportJson?: () => void;
+  onExportDesktopJson?: () => void;
   onImportJson?: (file: File) => void;
   onOpenProjects?: () => void;
   onRenderBackend?: () => void;
@@ -24,6 +25,7 @@ export function AppMenu({
   onExportWav,
   onExportRpp,
   onExportJson,
+  onExportDesktopJson,
   onImportJson,
   onOpenProjects,
   onRenderBackend,
@@ -96,6 +98,14 @@ export function AppMenu({
                 label="Export JSON"
                 onClick={() => {
                   onExportJson?.();
+                  setOpen(false);
+                }}
+              />
+              <MenuItem
+                icon={<Download size={14} />}
+                label="Export for Desktop"
+                onClick={() => {
+                  onExportDesktopJson?.();
                   setOpen(false);
                 }}
               />

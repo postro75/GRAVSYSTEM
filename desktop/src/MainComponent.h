@@ -22,6 +22,9 @@ public:
     void projectLoaded (gravsystem::ProjectModel* model) override;
     void timerCallback() override;
 
+    /** Load a project from a file path (used for CLI open and file chooser). */
+    void loadProjectFile (const juce::File& file);
+
 private:
     class TrackHeaderItem;
 

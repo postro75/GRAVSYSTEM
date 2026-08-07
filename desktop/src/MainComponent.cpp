@@ -1,4 +1,5 @@
 #include "MainComponent.h"
+#include <iostream>
 
 namespace
 {
@@ -181,17 +182,33 @@ void MainComponent::openProject()
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser)
     {
-        auto file = chooser.getResult();
-
-        if (! file.existsAsFile())
-            return;
-
-        auto json = file.loadFileAsString();
-        auto error = projectModel.loadFromJson (json);
-
-        if (error.isNotEmpty())
-            logToInfoLabel ("Load failed: " + error);
+        loadProjectFile (chooser.getResult());
     });
+}
+
+void MainComponent::loadProjectFile (const juce::File& file)
+{
+    if (! file.existsAsFile())
+    {
+        std::cout << "[GRAVSYSTEM] Project file does not exist: " << file.getFullPathName().toStdString() << std::endl;
+        return;
+    }
+
+    std::cout << "[GRAVSYSTEM] Loading project: " << file.getFullPathName().toStdString() << std::endl;
+
+    auto json = file.loadFileAsString();
+    auto error = projectModel.loadFromJson (json);
+
+    if (error.isNotEmpty())
+    {
+        std::cout << "[GRAVSYSTEM] Load failed: " << error.toStdString() << std::endl;
+        logToInfoLabel ("Load failed: " + error);
+    }
+    else
+    {
+        std::cout << "[GRAVSYSTEM] Project loaded: " << projectModel.getProject().title.toStdString()
+                  << " (" << projectModel.getProject().tracks.size() << " tracks)" << std::endl;
+    }
 }
 
 void MainComponent::updateProjectUI()

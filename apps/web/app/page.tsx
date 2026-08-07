@@ -26,6 +26,7 @@ import {
   loadLastProjectId,
   saveLastProjectId,
   exportProjectsJson,
+  exportProjectJson,
   importProjectsJson,
 } from '@/lib/storage';
 import { Loader2, Info, X } from 'lucide-react';
@@ -330,6 +331,24 @@ export default function Home() {
     }
   };
 
+  const handleExportDesktopJson = () => {
+    if (!dawProject) return;
+    try {
+      const json = exportProjectJson(dawProject);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dawProject.title.replace(/[^a-z0-9\-_]/gi, '_')}.gravsystem.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
   const handleImportJson = async (file: File) => {
     try {
       const text = await file.text();
@@ -486,6 +505,7 @@ export default function Home() {
         onExportWav={handleExportWav}
         onExportRpp={handleExportRpp}
         onExportJson={handleExportJson}
+        onExportDesktopJson={handleExportDesktopJson}
         onImportJson={handleImportJson}
         onOpenProjects={() => setIsProjectManagerOpen(true)}
         onRenderBackend={handleBackendRender}
