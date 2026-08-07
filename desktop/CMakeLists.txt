@@ -47,7 +47,6 @@ set(GRAVSYSTEM_JUCE_MODULES
   juce::juce_gui_basics
   juce::juce_audio_basics
   juce::juce_audio_devices
-  juce::juce_audio_utils
 )
 
 if(GRAVSYSTEM_ENABLE_VST3)
