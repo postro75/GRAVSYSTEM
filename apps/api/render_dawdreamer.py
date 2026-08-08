@@ -14,8 +14,8 @@ message.
 from __future__ import annotations
 
 import argparse
+import io
 import json
-import os
 import sys
 import tempfile
 import traceback
@@ -65,9 +65,24 @@ def _build_synth_plugin_path() -> str | None:
     return None
 
 
+def _audio_to_wav_bytes(audio: Any, sample_rate: int) -> bytes:
+    """Convert a DawDreamer audio buffer to a stereo WAV file in memory."""
+    try:
+        import soundfile as sf  # type: ignore[import-not-found]
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            "Audio was rendered but soundfile is not installed. "
+            "Install soundfile (`pip install soundfile`) to export WAV."
+        ) from exc
+
+    buffer = io.BytesIO()
+    sf.write(buffer, audio.transpose(), sample_rate, format="WAV", subtype="PCM_16")
+    return buffer.getvalue()
+
+
 def _render_with_dawdreamer(
     project: Project,
-    output_path: Path,
+    output_path: Path | None,
     sample_rate: int = 44100,
     block_size: int = 512,
     plugin_path: str | None = None,
@@ -98,21 +113,15 @@ def _render_with_dawdreamer(
     duration_seconds = project.bars * 4 * (60.0 / project.bpm)
     engine.render(duration_seconds)
     audio = engine.get_audio()
+    wav_bytes = _audio_to_wav_bytes(audio, sample_rate)
 
-    # DawDreamer returns audio as a NumPy array; write it via scipy or soundfile.
-    try:
-        import soundfile as sf  # type: ignore[import-not-found]
-
-        sf.write(output_path, audio.transpose(), sample_rate)
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(
-            "Audio was rendered but could not be written. "
-            "Install soundfile (`pip install soundfile`) to export WAV."
-        ) from exc
+    if output_path is not None:
+        output_path.write_bytes(wav_bytes)
 
     return {
         "success": True,
-        "output_path": str(output_path),
+        "output_path": str(output_path) if output_path else None,
+        "wav_bytes": wav_bytes,
         "sample_rate": sample_rate,
         "duration_seconds": duration_seconds,
         "plugin": synth_name,
@@ -148,10 +157,12 @@ def render_project(
     # Fallback: export MIDI only.
     midi_path = _midi_path_for_project(project)
     midi_path.write_bytes(project_to_midi_bytes(project))
+    midi_bytes = project_to_midi_bytes(project)
     return {
         "success": False,
         "output_path": None,
         "midi_path": str(midi_path),
+        "midi_bytes": midi_bytes,
         "diagnostic": (
             "DawDreamer is not available or the render failed. "
             "A Standard MIDI File was exported instead; import it into a DAW "

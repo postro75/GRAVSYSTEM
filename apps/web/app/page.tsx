@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
 import { Toolbar } from '@/components/daw/Toolbar';
+import { TransportBar, SnapGrid, ToolMode } from '@/components/daw/TransportBar';
 import { TrackHeaders } from '@/components/daw/TrackHeaders';
 import { Timeline } from '@/components/daw/Timeline';
 import { Inspector } from '@/components/daw/Inspector';
+import { WamPluginModal } from '@/components/daw/WamPluginModal';
+import { AudioSplash } from '@/components/daw/AudioSplash';
 import { BottomPanel, BottomTab } from '@/components/daw/BottomPanel';
 import { ProjectManager } from '@/components/daw/ProjectManager';
 import { GenerationRequest as FormGenerationRequest } from '@/lib/types';
@@ -15,6 +18,7 @@ import { AudioEngine, AudioEngineState } from '@/lib/audio-engine';
 import { downloadMidi } from '@/lib/midi-export';
 import { downloadRpp } from '@/lib/rpp-export';
 import { renderProjectToWav, downloadWav } from '@/lib/audio-export';
+import { renderProjectOnBackend, downloadRenderResult } from '@/lib/render-client';
 import { generateProject } from '@/lib/generator';
 import {
   loadProjects,
@@ -22,6 +26,7 @@ import {
   loadLastProjectId,
   saveLastProjectId,
   exportProjectsJson,
+  exportProjectJson,
   importProjectsJson,
 } from '@/lib/storage';
 import { Loader2, Info, X } from 'lucide-react';
@@ -48,13 +53,19 @@ export default function Home() {
   const [position, setPosition] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [showHints, setShowHints] = useState(true);
+  const [showHints, setShowHints] = useState(false);
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
+  const [isBackendRendering, setIsBackendRendering] = useState(false);
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('piano');
   const [meterLevels, setMeterLevels] = useState<Record<string, number>>({});
+  const [wamPluginTrackId, setWamPluginTrackId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isLoopEnabled, setIsLoopEnabled] = useState(false);
+  const [snapGrid, setSnapGrid] = useState<SnapGrid>('1/16');
+  const [toolMode, setToolMode] = useState<ToolMode>('cursor');
 
   const playerRef = useRef<AudioEngine | null>(null);
 
@@ -271,6 +282,23 @@ export default function Home() {
     }
   };
 
+  const handleBackendRender = async () => {
+    if (!dawProject) return;
+    setIsBackendRendering(true);
+    setError(null);
+    try {
+      const result = await renderProjectOnBackend(dawProject);
+      downloadRenderResult(result);
+      if (result.type === 'midi') {
+        setError(`Backend render fallback: ${result.diagnostic}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Backend render failed');
+    } finally {
+      setIsBackendRendering(false);
+    }
+  };
+
   const handleToggleMetronome = () => {
     const next = !metronomeEnabled;
     setMetronomeEnabled(next);
@@ -294,6 +322,24 @@ export default function Home() {
       const a = document.createElement('a');
       a.href = url;
       a.download = `gravsystem-projects-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    }
+  };
+
+  const handleExportDesktopJson = () => {
+    if (!dawProject) return;
+    try {
+      const json = exportProjectJson(dawProject);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dawProject.title.replace(/[^a-z0-9\-_]/gi, '_')}.gravsystem.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -438,45 +484,65 @@ export default function Home() {
     setProjects((prev) => prev.map((p) => (p.id === nextProject.id ? nextProject : p)));
   };
 
+  const handleOpenWamGui = (trackId: string) => {
+    setWamPluginTrackId(trackId);
+  };
+
   const selectedTrack = dawProject?.tracks.find((t) => t.id === selectedTrackId) ?? null;
+  const wamPluginInstrument = wamPluginTrackId
+    ? (playerRef.current?.getInstrument(wamPluginTrackId) as import('@/lib/wam-host').WamInstrument | undefined)
+    : null;
+  const wamPluginName = wamPluginTrackId
+    ? (getInstrumentById(
+        dawProject?.tracks.find((t) => t.id === wamPluginTrackId)?.instrument ?? ''
+      )?.name ?? 'WAM Plugin')
+    : 'WAM Plugin';
 
   return (
     <div className="flex h-screen flex-col bg-apple-bg">
-      <Header />
+      <Header
+        onExportMidi={handleExportMidi}
+        onExportWav={handleExportWav}
+        onExportRpp={handleExportRpp}
+        onExportJson={handleExportJson}
+        onExportDesktopJson={handleExportDesktopJson}
+        onImportJson={handleImportJson}
+        onOpenProjects={() => setIsProjectManagerOpen(true)}
+        onRenderBackend={handleBackendRender}
+        canExport={!!dawProject}
+        isRendering={isRendering}
+        isBackendRendering={isBackendRendering}
+      />
 
       <Toolbar
         prompt={prompt}
         onPromptChange={setPrompt}
         onGenerate={handlePromptGenerate}
         isGenerating={isGenerating}
+      />
+
+      <TransportBar
         isPlaying={playerState.isPlaying}
+        isRecording={isRecording}
+        isLoopEnabled={isLoopEnabled}
+        metronomeEnabled={metronomeEnabled}
         bpm={dawProject?.bpm ?? 120}
-        key={dawProject?.key ?? 'D'}
+        musicalKey={dawProject?.key ?? 'D'}
         scale={dawProject?.scale ?? 'minor'}
         position={formatTime(position)}
-        metronomeEnabled={metronomeEnabled}
+        snapGrid={snapGrid}
+        toolMode={toolMode}
         onPlay={handlePlay}
         onPause={handlePause}
         onStop={handleStop}
+        onRecordToggle={() => setIsRecording((prev) => !prev)}
+        onLoopToggle={() => setIsLoopEnabled((prev) => !prev)}
         onMetronomeToggle={handleToggleMetronome}
-        onExportMidi={handleExportMidi}
-        onExportWav={handleExportWav}
-        onExportRpp={handleExportRpp}
-        onExportJson={handleExportJson}
-        onImportJson={handleImportJson}
-        onOpenProjects={() => setIsProjectManagerOpen(true)}
-        canExport={!!dawProject}
-        isRendering={isRendering}
+        onSnapChange={setSnapGrid}
+        onToolModeChange={setToolMode}
       />
 
-      {!playerState.isReady && !playerState.loading && (
-        <button
-          onClick={handleEnableAudio}
-          className="flex w-full items-center justify-center gap-2 border-b border-apple-border bg-apple-accent/10 px-4 py-2 text-sm font-medium text-apple-accent transition hover:bg-apple-accent/20"
-        >
-          Enable Audio
-        </button>
-      )}
+      {!playerState.isReady && !playerState.loading && <AudioSplash onStart={handleEnableAudio} />}
 
       {showHints && (
         <div className="flex items-start gap-3 border-b border-apple-border bg-apple-surface-raised px-4 py-2 text-sm text-apple-text">
@@ -514,7 +580,7 @@ export default function Home() {
         </div>
       )}
 
-      <main className="flex min-h-0 flex-1">
+      <main className="flex min-h-0 flex-1 divide-x divide-apple-border bg-apple-bg">
         <TrackHeaders
           tracks={dawProject?.tracks ?? []}
           selectedTrackId={selectedTrackId}
@@ -531,6 +597,8 @@ export default function Home() {
               position={position}
               bpm={dawProject?.bpm ?? 120}
               selectedRegionId={selectedRegion?.id}
+              snapGrid={snapGrid}
+              toolMode={toolMode}
               onRegionClick={handleRegionClick}
               onRegionChange={handleRegionChange}
               onRegionDuplicate={handleRegionDuplicate}
@@ -548,6 +616,8 @@ export default function Home() {
             scale={dawProject?.scale ?? 'minor'}
             position={position}
             activeTab={activeBottomTab}
+            snapGrid={snapGrid}
+            toolMode={toolMode}
             onActiveTabChange={setActiveBottomTab}
             onRegionChange={handleRegionChange}
             onTrackChange={handleTrackChange}
@@ -581,6 +651,14 @@ export default function Home() {
           onInstrumentParamsChange={handleInstrumentParamsChange}
           onInsertEffectsChange={handleInsertEffectsChange}
           onSidechainChange={handleSidechainChange}
+          onOpenWamGui={handleOpenWamGui}
+        />
+
+        <WamPluginModal
+          instrument={wamPluginInstrument ?? null}
+          pluginName={wamPluginName}
+          isOpen={!!wamPluginTrackId}
+          onClose={() => setWamPluginTrackId(null)}
         />
       </main>
 
