@@ -1,22 +1,22 @@
-import { Music2 } from 'lucide-react';
+'use client';
 
-export function Header() {
+import { Music2 } from 'lucide-react';
+import { AppMenu, AppMenuProps } from './daw/AppMenu';
+
+export function Header(props: AppMenuProps) {
   return (
-    <header className="sticky top-0 z-50 border-b border-apple-border bg-apple-surface/90 backdrop-blur-xl">
-      <div className="flex items-center justify-between px-4 py-3">
+    <header className="sticky top-0 z-50 h-12 border-b border-apple-border bg-apple-surface px-4">
+      <div className="flex h-full items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-apple-accent text-white shadow-apple-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-apple-accent text-white">
             <Music2 size={18} strokeWidth={2.5} />
           </div>
           <div>
-            <h1 className="text-base font-semibold tracking-tight text-apple-text">GRAVSYSTEM</h1>
-            <p className="text-[10px] text-apple-muted">AI-powered music project generator</p>
+            <h1 className="text-sm font-semibold leading-tight text-apple-text">GRAVSYSTEM</h1>
+            <p className="text-[10px] leading-tight text-apple-muted">AI music project generator</p>
           </div>
         </div>
-        <div className="hidden items-center gap-2 text-xs font-medium text-apple-muted sm:flex">
-          <span className="h-2 w-2 rounded-full bg-apple-success" />
-          Ready
-        </div>
+        <AppMenu {...props} />
       </div>
     </header>
   );

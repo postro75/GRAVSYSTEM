@@ -29,4 +29,8 @@ export function saveLastProjectId(id: string): Promise<void> {
   return saveLastProjectIdDb(id);
 }
 
+export function exportProjectJson(project: Project): string {
+  return JSON.stringify(project, null, 2);
+}
+
 export { exportProjectsJson, importProjectsJson };

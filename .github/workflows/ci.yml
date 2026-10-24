@@ -23,6 +23,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Lockfile lacks the Linux native binaries (npm/cli#4828); add them without touching the lockfile.
+      - name: Install native build binaries
+        run: >
+          npm install --no-save --no-audit --no-fund
+          "@rollup/rollup-linux-x64-gnu@$(node -p "require('rollup/package.json').version")"
+          "@esbuild/linux-x64@$(node -p "require('esbuild/package.json').version")"
+
       - name: Build shared packages
         run: npm run build --workspace=@gravsystem/core
 
