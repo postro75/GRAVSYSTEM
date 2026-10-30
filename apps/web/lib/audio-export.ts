@@ -191,7 +191,7 @@ export async function renderProjectToWav(project: Project): Promise<Blob> {
         const part = new Tone.Part<ScheduledNote>((time, value) => {
           const vel = Math.max(0, Math.min(1, value.velocity));
           if (synth instanceof Tone.PolySynth || synth instanceof Tone.MonoSynth || synth instanceof Tone.DuoSynth || synth instanceof Tone.FMSynth) {
-            synth.triggerAttackRelease(value.note, value.duration, time, vel);
+            synth.triggerAttackRelease(Tone.Frequency(value.note, 'midi').toFrequency(), value.duration, time, vel);
           }
         }, notes);
         part.start(0);

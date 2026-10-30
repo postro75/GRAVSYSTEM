@@ -26,6 +26,21 @@ import {
 } from './instrument-params';
 import { loadSynth101, WamInstrument } from './wam-host';
 
+/** Tone synths interpret plain numbers as Hz, so MIDI note numbers must be converted. */
+export const midiToFreq = (midi: number): number => Tone.Frequency(midi, 'midi').toFrequency();
+
+let contextConfigured = false;
+/** Use a playback-oriented context (bigger buffer + lookahead) to avoid crackles on dense projects. */
+function configureAudioContext() {
+  if (contextConfigured || typeof window === 'undefined') return;
+  contextConfigured = true;
+  try {
+    Tone.setContext(new Tone.Context({ latencyHint: 'playback', lookAhead: 0.15 }));
+  } catch {
+    /* keep the default context */
+  }
+}
+
 export interface AudioEngineState {
   isPlaying: boolean;
   isReady: boolean;
@@ -122,6 +137,7 @@ export class AudioEngine {
   private automationEventIds: number[] = [];
 
   constructor(onStateChange?: (state: AudioEngineState) => void) {
+    configureAudioContext();
     this.onStateChange = onStateChange;
   }
 
@@ -516,7 +532,7 @@ export class AudioEngine {
     if ('scheduleNote' in instrument && typeof instrument.scheduleNote === 'function') {
       instrument.scheduleNote(pitch, Tone.now(), dur, Math.round(vel * 127));
     } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-      instrument.triggerAttackRelease(pitch, dur, Tone.now(), vel);
+      instrument.triggerAttackRelease(midiToFreq(pitch), dur, Tone.now(), vel);
     } else {
       (instrument as Soundfont).start({
         note: pitch,
@@ -596,7 +612,7 @@ export class AudioEngine {
           if ('scheduleNote' in instrument && typeof instrument.scheduleNote === 'function') {
             instrument.scheduleNote(value.note, time, value.duration, Math.round(vel * 127));
           } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-            instrument.triggerAttackRelease(value.note, value.duration, time, vel);
+            instrument.triggerAttackRelease(midiToFreq(value.note), value.duration, time, vel);
           } else {
             (instrument as Soundfont).start({
               note: value.note,
@@ -795,14 +811,28 @@ export class AudioEngine {
     this.emit({ isPlaying: true });
   }
 
+  private releaseAllVoices() {
+    for (const inst of this.instruments.values()) {
+      if ('releaseAll' in inst && typeof inst.releaseAll === 'function') {
+        try { inst.releaseAll(); } catch { /* noop */ }
+      } else if ('triggerRelease' in inst && typeof inst.triggerRelease === 'function') {
+        try { (inst as Tone.MonoSynth).triggerRelease(); } catch { /* noop */ }
+      } else if ('stop' in inst && typeof inst.stop === 'function') {
+        try { (inst as unknown as { stop: () => void }).stop(); } catch { /* noop */ }
+      }
+    }
+  }
+
   pause() {
     Tone.Transport.pause();
+    this.releaseAllVoices();
     this.emit({ isPlaying: false });
   }
 
   stop() {
     Tone.Transport.stop();
     Tone.Transport.position = '0:0:0';
+    this.releaseAllVoices();
     this.emit({ isPlaying: false });
   }
 
