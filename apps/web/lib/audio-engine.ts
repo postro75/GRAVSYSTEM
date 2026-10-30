@@ -125,21 +125,52 @@ export class AudioEngine {
     this.onStateChange = onStateChange;
   }
 
+  private pendingProject?: Project;
+  private chainBuilt = false;
+  private lastPlaying = false;
+  private lastReady = false;
+
   private emit(partial: Partial<AudioEngineState>) {
+    if (partial.isPlaying !== undefined) this.lastPlaying = partial.isPlaying;
+    if (partial.isReady !== undefined) this.lastReady = partial.isReady;
     this.onStateChange?.({
-      isPlaying: false,
-      isReady: false,
+      isPlaying: this.lastPlaying,
+      isReady: this.lastReady,
       loading: this.loadingCount > 0,
       error: null,
       ...partial,
     });
   }
 
+  /** Build the master chain on the (possibly still suspended) context, then try to start it. */
   async init() {
     try {
-      await Tone.start();
-      this.isStarted = true;
+      this.buildMasterChain();
+      // Without a user gesture this stays pending until the first click; that is fine.
+      void Tone.start().then(() => this.onContextRunning()).catch(() => {});
+      this.emit({ isReady: this.isStarted });
+    } catch (err) {
+      this.emit({ error: err instanceof Error ? err.message : 'Audio engine init failed' });
+    }
+  }
 
+  private async onContextRunning() {
+    if (this.isStarted) return;
+    this.isStarted = true;
+    this.buildMasterChain();
+    this.emit({ isReady: true });
+    // A project may have been generated/restored before the user enabled audio.
+    if (this.pendingProject) {
+      const project = this.pendingProject;
+      this.pendingProject = undefined;
+      await this.loadProject(project);
+    }
+  }
+
+  private buildMasterChain() {
+    if (this.chainBuilt) return;
+    this.chainBuilt = true;
+    try {
       // Master effects chain: time effects -> EQ -> dynamics -> safety limiter
       const limiter = new Tone.Limiter(-0.5).toDestination();
       this.masterCompressor = new Tone.Compressor(-20, 3.5).connect(limiter);
@@ -163,10 +194,9 @@ export class AudioEngine {
         envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
         volume: -12,
       }).connect(limiter);
-
-      this.emit({ isReady: true });
     } catch (err) {
-      this.emit({ error: err instanceof Error ? err.message : 'Audio engine init failed' });
+      this.chainBuilt = false;
+      throw err;
     }
   }
 
@@ -174,15 +204,18 @@ export class AudioEngine {
     if (this.isStarted) return;
     try {
       await Tone.start();
-      this.isStarted = true;
-      this.emit({ isReady: true });
+      await this.onContextRunning();
     } catch (err) {
       this.emit({ error: err instanceof Error ? err.message : 'Audio engine resume failed' });
     }
   }
 
   async loadProject(project: Project) {
-    if (!this.isStarted) return;
+    if (!this.isStarted) {
+      this.pendingProject = project;
+      this.project = project;
+      return;
+    }
     this.emit({ loading: true, isReady: false });
     this.disposeParts();
     this.project = project;
@@ -754,7 +787,8 @@ export class AudioEngine {
     this.parts = [];
   }
 
-  play() {
+  async play() {
+    if (!this.isStarted) await this.resumeAudio();
     if (!this.isStarted) return;
     Tone.Transport.start('+0.05');
     this.emit({ isPlaying: true });
