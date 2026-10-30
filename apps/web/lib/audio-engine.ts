@@ -216,7 +216,7 @@ export class AudioEngine {
       this.project = project;
       return;
     }
-    this.emit({ loading: true, isReady: false });
+    this.emit({ loading: true, isReady: true });
     this.disposeParts();
     this.project = project;
 
@@ -233,6 +233,7 @@ export class AudioEngine {
     } catch (err) {
       this.emit({
         error: err instanceof Error ? err.message : 'Project load failed',
+        isReady: true,
         loading: false,
       });
     }
