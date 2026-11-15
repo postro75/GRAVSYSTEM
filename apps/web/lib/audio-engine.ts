@@ -26,6 +26,21 @@ import {
 } from './instrument-params';
 import { loadWamPlugin, WamInstrument } from './wam-host';
 
+/** Tone synths interpret plain numbers as Hz, so MIDI note numbers must be converted. */
+export const midiToFreq = (midi: number): number => Tone.Frequency(midi, 'midi').toFrequency();
+
+let contextConfigured = false;
+/** Use a playback-oriented context (bigger buffer + lookahead) to avoid crackles on dense projects. */
+function configureAudioContext() {
+  if (contextConfigured || typeof window === 'undefined') return;
+  contextConfigured = true;
+  try {
+    Tone.setContext(new Tone.Context({ latencyHint: 'playback', lookAhead: 0.15 }));
+  } catch {
+    /* keep the default context */
+  }
+}
+
 export interface AudioEngineState {
   isPlaying: boolean;
   isReady: boolean;
@@ -109,7 +124,6 @@ export function sidechainCurve(style: string): SidechainCurve {
 
 export class AudioEngine {
   private project: Project | null = null;
-  private pendingProject: Project | null = null;
   private onStateChange?: (state: AudioEngineState) => void;
   private isStarted = false;
   private parts: Tone.Part[] = [];
@@ -129,24 +143,56 @@ export class AudioEngine {
   private automationEventIds: number[] = [];
 
   constructor(onStateChange?: (state: AudioEngineState) => void) {
+    configureAudioContext();
     this.onStateChange = onStateChange;
   }
 
+  private pendingProject?: Project;
+  private chainBuilt = false;
+  private lastPlaying = false;
+  private lastReady = false;
+
   private emit(partial: Partial<AudioEngineState>) {
+    if (partial.isPlaying !== undefined) this.lastPlaying = partial.isPlaying;
+    if (partial.isReady !== undefined) this.lastReady = partial.isReady;
     this.onStateChange?.({
-      isPlaying: false,
-      isReady: false,
+      isPlaying: this.lastPlaying,
+      isReady: this.lastReady,
       loading: this.loadingCount > 0,
       error: null,
       ...partial,
     });
   }
 
+  /** Build the master chain on the (possibly still suspended) context, then try to start it. */
   async init() {
     try {
-      await Tone.start();
-      this.isStarted = true;
+      this.buildMasterChain();
+      // Without a user gesture this stays pending until the first click; that is fine.
+      void Tone.start().then(() => this.onContextRunning()).catch(() => {});
+      this.emit({ isReady: this.isStarted });
+    } catch (err) {
+      this.emit({ error: err instanceof Error ? err.message : 'Audio engine init failed' });
+    }
+  }
 
+  private async onContextRunning() {
+    if (this.isStarted) return;
+    this.isStarted = true;
+    this.buildMasterChain();
+    this.emit({ isReady: true });
+    // A project may have been generated/restored before the user enabled audio.
+    if (this.pendingProject) {
+      const project = this.pendingProject;
+      this.pendingProject = undefined;
+      await this.loadProject(project);
+    }
+  }
+
+  private buildMasterChain() {
+    if (this.chainBuilt) return;
+    this.chainBuilt = true;
+    try {
       // Master effects chain: time effects -> EQ -> dynamics -> safety limiter
       const limiter = new Tone.Limiter(-0.5).toDestination();
       this.masterCompressor = new Tone.Compressor(-20, 3.5).connect(limiter);
@@ -170,10 +216,9 @@ export class AudioEngine {
         envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
         volume: -12,
       }).connect(limiter);
-
-      this.emit({ isReady: true });
     } catch (err) {
-      this.emit({ error: err instanceof Error ? err.message : 'Audio engine init failed' });
+      this.chainBuilt = false;
+      throw err;
     }
   }
 
@@ -181,14 +226,7 @@ export class AudioEngine {
     if (this.isStarted) return;
     try {
       await Tone.start();
-      this.isStarted = true;
-      this.emit({ isReady: true });
-      // If a project was queued before audio was allowed, load it now.
-      if (this.pendingProject) {
-        const project = this.pendingProject;
-        this.pendingProject = null;
-        await this.loadProject(project);
-      }
+      await this.onContextRunning();
     } catch (err) {
       this.emit({ error: err instanceof Error ? err.message : 'Audio engine resume failed' });
     }
@@ -196,11 +234,11 @@ export class AudioEngine {
 
   async loadProject(project: Project) {
     if (!this.isStarted) {
-      // AudioContext not allowed yet — queue the project for resumeAudio().
       this.pendingProject = project;
+      this.project = project;
       return;
     }
-    this.emit({ loading: true, isReady: false });
+    this.emit({ loading: true, isReady: true });
     this.disposeParts();
     this.project = project;
 
@@ -217,6 +255,7 @@ export class AudioEngine {
     } catch (err) {
       this.emit({
         error: err instanceof Error ? err.message : 'Project load failed',
+        isReady: true,
         loading: false,
       });
     }
@@ -500,7 +539,7 @@ export class AudioEngine {
     if ('scheduleNote' in instrument && typeof instrument.scheduleNote === 'function') {
       instrument.scheduleNote(pitch, Tone.now(), dur, Math.round(vel * 127));
     } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-      instrument.triggerAttackRelease(pitch, dur, Tone.now(), vel);
+      instrument.triggerAttackRelease(midiToFreq(pitch), dur, Tone.now(), vel);
     } else {
       (instrument as Soundfont).start({
         note: pitch,
@@ -580,7 +619,7 @@ export class AudioEngine {
           if ('scheduleNote' in instrument && typeof instrument.scheduleNote === 'function') {
             instrument.scheduleNote(value.note, time, value.duration, Math.round(vel * 127));
           } else if ('triggerAttackRelease' in instrument && typeof instrument.triggerAttackRelease === 'function') {
-            instrument.triggerAttackRelease(value.note, value.duration, time, vel);
+            instrument.triggerAttackRelease(midiToFreq(value.note), value.duration, time, vel);
           } else {
             (instrument as Soundfont).start({
               note: value.note,
@@ -777,20 +816,35 @@ export class AudioEngine {
     this.parts = [];
   }
 
-  play() {
+  async play() {
+    if (!this.isStarted) await this.resumeAudio();
     if (!this.isStarted) return;
     Tone.Transport.start('+0.05');
     this.emit({ isPlaying: true });
   }
 
+  private releaseAllVoices() {
+    for (const inst of this.instruments.values()) {
+      if ('releaseAll' in inst && typeof inst.releaseAll === 'function') {
+        try { inst.releaseAll(); } catch { /* noop */ }
+      } else if ('triggerRelease' in inst && typeof inst.triggerRelease === 'function') {
+        try { (inst as Tone.MonoSynth).triggerRelease(); } catch { /* noop */ }
+      } else if ('stop' in inst && typeof inst.stop === 'function') {
+        try { (inst as unknown as { stop: () => void }).stop(); } catch { /* noop */ }
+      }
+    }
+  }
+
   pause() {
     Tone.Transport.pause();
+    this.releaseAllVoices();
     this.emit({ isPlaying: false });
   }
 
   stop() {
     Tone.Transport.stop();
     Tone.Transport.position = '0:0:0';
+    this.releaseAllVoices();
     this.emit({ isPlaying: false });
   }
 

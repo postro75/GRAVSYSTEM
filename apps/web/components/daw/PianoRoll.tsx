@@ -84,7 +84,7 @@ export function PianoRoll({
   const playPreview = async (pitch: number, velocity = 100) => {
     await ensurePreviewSynth();
     const vel = Math.max(0, Math.min(1, velocity / 127));
-    previewSynthRef.current?.triggerAttackRelease(pitch, '16n', Tone.now(), vel);
+    previewSynthRef.current?.triggerAttackRelease(Tone.Frequency(pitch, 'midi').toFrequency(), '16n', Tone.now(), vel);
   };
 
   useEffect(() => {
