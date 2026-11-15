@@ -31,6 +31,8 @@ export default [
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
+      // Disabled: produces spurious parser errors on valid Tailwind JSX in this codebase.
+      'react/no-unknown-property': 'off',
     },
     settings: {
       react: {

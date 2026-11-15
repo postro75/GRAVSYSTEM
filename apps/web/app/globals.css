@@ -3,6 +3,21 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Professional DAW dark theme. Higher contrast for readability. */
+    --apple-bg: #050507;
+    --apple-surface: #0f0f12;
+    --apple-surface-raised: #18181c;
+    --apple-border: #26262c;
+    --apple-text: #f2f2f7;
+    --apple-muted: #8e8e99;
+    --apple-accent: #0ea5e9;
+    --apple-accent-hover: #38bdf8;
+    --apple-success: #22c55e;
+    --apple-warning: #f59e0b;
+    --apple-danger: #ef4444;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -13,21 +28,53 @@
   }
 
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--apple-surface);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 5px;
+    border: 2px solid var(--apple-surface);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Compact range inputs used for faders/sliders. */
+  input[type='range'].daw-range {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--apple-border);
+    outline: none;
+  }
+
+  input[type='range'].daw-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--apple-text);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+
+  input[type='range'].daw-range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: none;
+    border-radius: 50%;
+    background: var(--apple-text);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 }
 

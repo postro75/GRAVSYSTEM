@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -13,6 +14,7 @@ from schemas import Project, GenerationRequest, Track, Region, MidiEvent
 from music_theory import build_config
 from pattern_generator import generate_midi_events, TICKS_PER_BEAT
 from midi_export import project_to_midi_bytes
+from render_dawdreamer import render_project
 
 app = FastAPI(
     title="GRAVSYSTEM API",
@@ -149,6 +151,38 @@ def export_midi(project: Project) -> Response:
         content=midi_bytes,
         media_type="audio/midi",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/api/render")
+def render(project: Project) -> Response:
+    """Render a Project JSON to audio (WAV) or fall back to MIDI."""
+    result = render_project(project)
+
+    if result.get("success"):
+        wav_bytes = result["wav_bytes"]
+        filename = f"{project.title.replace(' ', '_')}.wav"
+        return Response(
+            content=bytes(wav_bytes),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # Fallback: return MIDI bytes plus diagnostic metadata as JSON.
+    midi_bytes = result.get("midi_bytes") or project_to_midi_bytes(project)
+    import base64
+
+    return Response(
+        content=json.dumps(
+            {
+                "success": False,
+                "diagnostic": result.get("diagnostic"),
+                "midi": base64.b64encode(bytes(midi_bytes)).decode("ascii"),
+                "filename": f"{project.title.replace(' ', '_')}.mid",
+                "dawdreamer_available": result.get("dawdreamer_available", False),
+            }
+        ),
+        media_type="application/json",
     )
 
 

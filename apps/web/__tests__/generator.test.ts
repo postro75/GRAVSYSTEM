@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { generateProject } from '@/lib/generator';
 import { generateMidiEvents } from '@/lib/pattern-generator';
 import { buildConfig, defaultArrangement, Density } from '@/lib/music-theory';
@@ -162,6 +162,32 @@ describe('generateProject', () => {
 
     const sidechainOn = jarre.tracks.filter((t) => t.sidechain);
     expect(sidechainOn.length).toBe(0);
+  });
+
+  it('prefers WAM instruments when NEXT_PUBLIC_ENABLE_WAM is set', async () => {
+    vi.resetModules();
+    process.env.NEXT_PUBLIC_ENABLE_WAM = 'true';
+
+    const { generateProject: generateWithWam } = await import('@/lib/generator');
+    const { STYLE_INSTRUMENT_PALETTE: paletteWithWam } = await import('@/lib/instruments');
+
+    expect(paletteWithWam.jarre.lead).toContain('wam-synth101');
+    expect(paletteWithWam.jarre.pad).toContain('wam-modal');
+
+    const jarre = generateWithWam({
+      description: 'Jarre ambient WAM test',
+      style: 'jarre',
+      bpm: 108,
+      bars: 32,
+      key: 'D',
+      scale: 'minor',
+    });
+
+    const wamTracks = jarre.tracks.filter((t) => t.instrument?.startsWith('wam-'));
+    expect(wamTracks.length).toBeGreaterThan(0);
+
+    delete process.env.NEXT_PUBLIC_ENABLE_WAM;
+    vi.resetModules();
   });
 });
 
