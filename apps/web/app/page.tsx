@@ -451,7 +451,7 @@ export default function Home() {
         isGenerating={isGenerating}
         isPlaying={playerState.isPlaying}
         bpm={dawProject?.bpm ?? 120}
-        key={dawProject?.key ?? 'D'}
+        musicKey={dawProject?.key ?? 'D'}
         scale={dawProject?.scale ?? 'minor'}
         position={formatTime(position)}
         metronomeEnabled={metronomeEnabled}

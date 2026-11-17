@@ -1,3 +1,5 @@
+import os
+import re
 from typing import Any
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -20,13 +22,23 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Browser traffic reaches the API through the same-origin Vercel rewrite, so CORS is only
+# needed for explicitly listed origins (comma-separated env var). Default: none.
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
+
+
+def safe_filename(title: str, ext: str) -> str:
+    """Build a Content-Disposition-safe filename: only letters, digits, dot, dash, underscore."""
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", title).strip("._") or "project"
+    return f"{stem[:100]}.{ext}"
 
 
 def ticks_to_beats(ticks: int) -> float:
@@ -144,7 +156,7 @@ def generate_project(request: GenerationRequest) -> dict[str, Any]:
 def export_midi(project: Project) -> Response:
     """Export a Project JSON to a downloadable .mid file."""
     midi_bytes = project_to_midi_bytes(project)
-    filename = f"{project.title.replace(' ', '_')}.mid"
+    filename = safe_filename(project.title, "mid")
     return Response(
         content=midi_bytes,
         media_type="audio/midi",
