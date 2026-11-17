@@ -22,7 +22,7 @@ export interface ToolbarProps {
   isGenerating?: boolean;
   isPlaying?: boolean;
   bpm?: number;
-  key?: string;
+  musicKey?: string;
   scale?: string;
   position?: string;
   metronomeEnabled?: boolean;
@@ -47,7 +47,7 @@ export function Toolbar({
   isGenerating = false,
   isPlaying = false,
   bpm = 120,
-  key = 'D',
+  musicKey = 'D',
   scale = 'minor',
   position = '00:00.00',
   metronomeEnabled = false,
@@ -146,7 +146,7 @@ export function Toolbar({
           <div className="flex items-center gap-1.5">
             <span className="text-apple-muted">Key</span>
             <span className="font-medium text-apple-text">
-              {key} {scale}
+              {musicKey} {scale}
             </span>
           </div>
         </div>

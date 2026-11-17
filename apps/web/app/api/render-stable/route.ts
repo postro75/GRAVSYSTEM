@@ -21,9 +21,27 @@ function buildPrompt(config: MusicConfig): string {
 }
 
 export async function POST(request: NextRequest) {
+  // Paid upstream API: keep it off unless explicitly enabled on this deployment.
+  if (process.env.ENABLE_STABLE_AUDIO !== 'true') {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 });
+  }
+
   try {
-    const body: StableAudioRequest = await request.json();
-    const { config } = body;
+    let body: StableAudioRequest;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const config = body?.config;
+    if (
+      !config ||
+      typeof config.bpm !== 'number' || !Number.isFinite(config.bpm) || config.bpm < 40 || config.bpm > 240 ||
+      typeof config.bars !== 'number' || !Number.isFinite(config.bars) || config.bars < 1 || config.bars > 64 ||
+      typeof config.style !== 'string' || typeof config.key !== 'string' || typeof config.scale !== 'string'
+    ) {
+      return NextResponse.json({ success: false, error: 'Invalid config' }, { status: 400 });
+    }
 
     const apiKey = process.env.STABLE_AUDIO_API_KEY;
     if (!apiKey) {
