@@ -71,6 +71,13 @@ export function scaleNotes(key: string, scale: Scale, octave = 4): number[] {
   return intervals.map((interval) => baseMidi + interval);
 }
 
+export function isInScale(pitch: number, key: string, scale: Scale): boolean {
+  const root = KEY_INDEX[key] ?? 0;
+  const intervals = SCALE_INTERVALS[scale] ?? SCALE_INTERVALS.minor;
+  const normalized = ((pitch - root) % 12 + 12) % 12;
+  return intervals.includes(normalized);
+}
+
 const DIATONIC_CHORD_TYPES: Record<Scale, string[]> = {
   major: ['', 'm', 'm', '', '', 'm', 'dim'],
   minor: ['m', 'dim', '', 'm', 'm', '', ''],
