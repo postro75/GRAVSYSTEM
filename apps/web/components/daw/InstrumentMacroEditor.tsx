@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { InstrumentParams, DEFAULT_INSTRUMENT_PARAMS } from '@gravsystem/core';
 import type { InstrumentDefinition } from '@/lib/instruments';
 import { formatParamValue } from '@/lib/instrument-params';
-import { SlidersHorizontal } from 'lucide-react';
+import { Knob } from './Knob';
 
-interface SliderDef {
+interface KnobDef {
   key: keyof InstrumentParams;
   label: string;
   tip: string;
@@ -15,7 +15,7 @@ interface SliderDef {
   step: number;
 }
 
-const BASE_SLIDERS: SliderDef[] = [
+const BASE_KNOBS: KnobDef[] = [
   { key: 'attack', label: 'Attack', tip: 'How quickly the sound starts.', min: 0, max: 2000, step: 5 },
   { key: 'decay', label: 'Decay', tip: 'How quickly the sound falls to the sustain level.', min: 0, max: 2000, step: 5 },
   { key: 'sustain', label: 'Sustain', tip: 'Level held while a note is held.', min: 0, max: 100, step: 1 },
@@ -67,9 +67,9 @@ const CATEGORY_LABELS: Partial<
   },
 };
 
-function getSlidersForCategory(category?: InstrumentDefinition['category']): SliderDef[] {
+function getKnobsForCategory(category?: InstrumentDefinition['category']): KnobDef[] {
   const labels = category ? CATEGORY_LABELS[category] : undefined;
-  return BASE_SLIDERS.map((def) => ({
+  return BASE_KNOBS.map((def) => ({
     ...def,
     label: labels?.[def.key] ?? def.label,
   }));
@@ -81,13 +81,13 @@ export interface InstrumentMacroEditorProps {
   onChange?: (params: InstrumentParams) => void;
 }
 
-function toSliderValue(key: keyof InstrumentParams, value: number): number {
+function toKnobValue(key: keyof InstrumentParams, value: number): number {
   if (key === 'attack' || key === 'decay' || key === 'release') return value * 1000;
   if (key === 'sustain' || key === 'reverb' || key === 'delay') return value * 100;
   return value;
 }
 
-function fromSliderValue(key: keyof InstrumentParams, value: number): number {
+function fromKnobValue(key: keyof InstrumentParams, value: number): number {
   if (key === 'attack' || key === 'decay' || key === 'release') return value / 1000;
   if (key === 'sustain' || key === 'reverb' || key === 'delay') return value / 100;
   return value;
@@ -96,14 +96,14 @@ function fromSliderValue(key: keyof InstrumentParams, value: number): number {
 export function InstrumentMacroEditor({ params, category, onChange }: InstrumentMacroEditorProps) {
   const current = params ?? DEFAULT_INSTRUMENT_PARAMS;
   const [local, setLocal] = useState(current);
-  const sliders = getSlidersForCategory(category);
+  const knobs = getKnobsForCategory(category);
 
   useEffect(() => {
     setLocal(current);
   }, [current]);
 
-  const updateKey = (key: keyof InstrumentParams, sliderValue: number) => {
-    const next = { ...local, [key]: fromSliderValue(key, sliderValue) };
+  const updateKey = (key: keyof InstrumentParams, knobValue: number) => {
+    const next = { ...local, [key]: fromKnobValue(key, knobValue) };
     setLocal(next);
     onChange?.(next);
   };
@@ -113,62 +113,54 @@ export function InstrumentMacroEditor({ params, category, onChange }: Instrument
     onChange?.(DEFAULT_INSTRUMENT_PARAMS);
   };
 
-  const renderSlider = (def: SliderDef) => {
-    const value = toSliderValue(def.key, local[def.key]);
+  const renderKnob = (def: KnobDef) => {
+    const value = toKnobValue(def.key, local[def.key]);
     return (
-      <div key={def.key} className="flex flex-col gap-1">
-        <div className="flex items-center justify-between text-[10px] text-apple-muted" title={def.tip}>
-          <span className="cursor-help underline decoration-dotted underline-offset-2">{def.label}</span>
-          <span className="tabular-nums">{formatParamValue(def.key, local[def.key])}</span>
-        </div>
-        <input
-          type="range"
-          min={def.min}
-          max={def.max}
-          step={def.step}
-          value={value}
-          onChange={(e) => updateKey(def.key, Number(e.target.value))}
-          className="h-1.5 w-full cursor-pointer appearance-none rounded bg-apple-border accent-apple-accent"
-        />
-      </div>
+      <Knob
+        key={def.key}
+        value={value}
+        min={def.min}
+        max={def.max}
+        step={def.step}
+        onChange={(next) => updateKey(def.key, next)}
+        label={def.label}
+        valueText={formatParamValue(def.key, local[def.key])}
+        title={def.tip}
+        size={40}
+      />
     );
   };
 
   return (
-    <div className="flex h-full flex-col rounded-apple-sm border border-apple-border bg-apple-bg">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-apple-border px-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-apple-text">
-          <SlidersHorizontal size={12} />
-          Macros
-          {category && (
-            <span className="rounded bg-apple-surface-raised px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-apple-muted">
-              {category}
-            </span>
-          )}
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        {category && (
+          <span className="rounded bg-apple-surface-raised px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-apple-muted">
+            {category}
+          </span>
+        )}
         <button
           onClick={reset}
-          className="text-[10px] text-apple-muted transition hover:text-apple-accent"
+          className="ml-auto text-[10px] text-apple-muted transition hover:text-apple-accent"
         >
           Reset
         </button>
       </div>
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
-        <div>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
-            Envelope
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {sliders.filter((s) => ['attack', 'decay', 'sustain', 'release'].includes(s.key)).map(renderSlider)}
-          </div>
+
+      <div>
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
+          Envelope
         </div>
-        <div>
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
-            Tone & FX
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {sliders.filter((s) => ['cutoff', 'resonance', 'reverb', 'delay'].includes(s.key)).map(renderSlider)}
-          </div>
+        <div className="grid grid-cols-4 gap-2">
+          {knobs.filter((s) => ['attack', 'decay', 'sustain', 'release'].includes(s.key)).map(renderKnob)}
+        </div>
+      </div>
+      <div>
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-apple-muted">
+          Tone & FX
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {knobs.filter((s) => ['cutoff', 'resonance', 'reverb', 'delay'].includes(s.key)).map(renderKnob)}
         </div>
       </div>
     </div>

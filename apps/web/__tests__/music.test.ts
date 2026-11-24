@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseChord,
   scaleNotes,
+  isInScale,
   diatonicChords,
   defaultProgression,
   styleBpm,
@@ -28,6 +29,21 @@ describe('music theory', () => {
   it('builds scale notes', () => {
     const dMinor = scaleNotes('D', 'minor', 4);
     expect(dMinor).toEqual([62, 64, 65, 67, 69, 70, 72]);
+  });
+
+  it('checks whether a pitch belongs to a scale across octaves', () => {
+    // C major: C, D, E, F, G, A, B
+    expect(isInScale(60, 'C', 'major')).toBe(true); // C4
+    expect(isInScale(64, 'C', 'major')).toBe(true); // E4
+    expect(isInScale(61, 'C', 'major')).toBe(false); // C#4
+    expect(isInScale(72, 'C', 'major')).toBe(true); // C5
+    expect(isInScale(48, 'C', 'major')).toBe(true); // C3
+
+    // A minor: A, B, C, D, E, F, G
+    expect(isInScale(69, 'A', 'minor')).toBe(true); // A4
+    expect(isInScale(71, 'A', 'minor')).toBe(true); // B4
+    expect(isInScale(70, 'A', 'minor')).toBe(false); // A#4 / Bb4
+    expect(isInScale(68, 'A', 'minor')).toBe(false); // G#4
   });
 
   it('builds diatonic chords', () => {
